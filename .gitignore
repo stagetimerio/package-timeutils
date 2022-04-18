@@ -1,0 +1,28 @@
+.DS_Store
+node_modules
+dist
+.docker
+
+# local env files
+.env.local
+.env.*.local
+.env
+docker-compose.yml
+docker-compose.prod.yml
+docker-compose.local.yml
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+server/logs/*
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
