@@ -1,6 +1,8 @@
 import { default as chai } from 'chai'
 import {
   millisecondsToHms,
+  millisecondsToDhms,
+  dhmsToMilliseconds,
   hmsToMilliseconds,
   isValidDate,
   parseDate,
@@ -22,6 +24,36 @@ describe('timeUtils', () => {
     expect(millisecondsToHms(60000)).to.deep.equal({ hours: 0, minutes: 1, seconds: 0, decimals: 0 })
     expect(millisecondsToHms(3600000)).to.deep.equal({ hours: 1, minutes: 0, seconds: 0, decimals: 0 })
     expect(millisecondsToHms(3723400)).to.deep.equal({ hours: 1, minutes: 2, seconds: 3, decimals: 4 })
+  })
+
+  test('millisecondsToDhms', () => {
+    expect(millisecondsToDhms(97323400)).to.deep.equal({ negative: 0, days: 1, hours: 3, minutes: 2, seconds: 4, decimals: 4 })
+    expect(millisecondsToDhms(3723400)).to.deep.equal({ negative: 0, days: 0, hours: 1, minutes: 2, seconds: 4, decimals: 4 })
+    expect(millisecondsToDhms(3600000)).to.deep.equal({ negative: 0, days: 0, hours: 1, minutes: 0, seconds: 0, decimals: 0 })
+    expect(millisecondsToDhms(60000)).to.deep.equal({ negative: 0, days: 0, hours: 0, minutes: 1, seconds: 0, decimals: 0 })
+    expect(millisecondsToDhms(1500)).to.deep.equal({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 2, decimals: 5 })
+    expect(millisecondsToDhms(1000)).to.deep.equal({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 0 })
+    expect(millisecondsToDhms(500)).to.deep.equal({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 5 })
+    expect(millisecondsToDhms(0)).to.deep.equal({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 0, decimals: 0 })
+    expect(millisecondsToDhms(-500)).to.deep.equal({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 0, decimals: 5 })
+    expect(millisecondsToDhms(-1000)).to.deep.equal({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 0 })
+    expect(millisecondsToDhms(-1500)).to.deep.equal({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 5 })
+    expect(millisecondsToDhms(-97323400)).to.deep.equal({ negative: 1, days: 1, hours: 3, minutes: 2, seconds: 3, decimals: 4 })
+  })
+
+  test('dhmsToMilliseconds', () => {
+    expect(dhmsToMilliseconds({ negative: 0, days: 1, hours: 3, minutes: 2, seconds: 4, decimals: 4 })).to.deep.equal(97323400)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 1, minutes: 2, seconds: 4, decimals: 4 })).to.deep.equal(3723400)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 1, minutes: 0, seconds: 0, decimals: 0 })).to.deep.equal(3600000)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 0, minutes: 1, seconds: 0, decimals: 0 })).to.deep.equal(60000)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 2, decimals: 5 })).to.deep.equal(1500)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 0 })).to.deep.equal(1000)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 5 })).to.deep.equal(500)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 0, decimals: 0 })).to.deep.equal(0)
+    expect(dhmsToMilliseconds({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 0, decimals: 5 })).to.deep.equal(-500)
+    expect(dhmsToMilliseconds({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 0 })).to.deep.equal(-1000)
+    expect(dhmsToMilliseconds({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 5 })).to.deep.equal(-1500)
+    expect(dhmsToMilliseconds({ negative: 1, days: 1, hours: 3, minutes: 2, seconds: 3, decimals: 4 })).to.deep.equal(-97323400)
   })
 
   test('hmsToMilliseconds', () => {

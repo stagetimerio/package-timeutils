@@ -10,8 +10,37 @@ export function millisecondsToHms (ms = 0) {
   }
 }
 
+export function millisecondsToDhms (ms = 0) {
+  const negative = ms < 0 ? 1 : 0
+  const decimalMs = Math.abs(Math.floor(ms % 1000)) || 0
+  const roundedMs = Math.abs(Math.ceil(ms/1000)) * 1000
+
+  return {
+    negative,
+    days: Math.floor(roundedMs / 86400000) || 0,
+    hours: Math.floor((roundedMs % 86400000) / 3600000) || 0,
+    minutes: Math.floor((roundedMs % 3600000) / 60000) || 0,
+    seconds: Math.floor((roundedMs % 60000) / 1000) || 0,
+    decimals: Math.floor(decimalMs / 100),
+  }
+}
+
 export function hmsToMilliseconds ({ hours = 0, minutes = 0, seconds = 0 } = {}) {
   return (hours * 3600000) + (minutes * 60000) + (seconds * 1000)
+}
+
+export function dhmsToMilliseconds ({
+  negative = 0,
+  days = 0,
+  hours = 0,
+  minutes = 0,
+  seconds = 0,
+  decimals = 0,
+}) {
+  let ms = (days * 86400000) + (hours * 3600000) + (minutes * 60000) + (seconds * 1000) + (decimals * 100)
+  if (!negative && decimals > 0) ms -= 1000
+  const prefix = negative ? -1 : 1
+  return prefix * ms
 }
 
 export function isValidDate (date) {
