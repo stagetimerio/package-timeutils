@@ -69,9 +69,9 @@ export function applyDate (date, ymdDate) {
   if (!isValidDate(parsed)) return null
   if (!isValidDate(ymd)) return parsed
   const clone = new Date(parsed)
-  clone.setFullYear(ymd.getFullYear())
-  clone.setMonth(ymd.getMonth())
   clone.setDate(ymd.getDate())
+  clone.setMonth(ymd.getMonth())
+  clone.setFullYear(ymd.getFullYear())
   clone.setUTCHours(parsed.getUTCHours())
   return clone
 }
