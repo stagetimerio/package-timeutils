@@ -26,7 +26,7 @@ describe('timeUtils', () => {
     expect(millisecondsToHms(3723400)).to.deep.equal({ hours: 1, minutes: 2, seconds: 3, decimals: 4 })
   })
 
-  test('millisecondsToDhms', () => {
+  test('millisecondsToDhms ceil = true', () => {
     expect(millisecondsToDhms(97323400)).to.deep.equal({ negative: 0, days: 1, hours: 3, minutes: 2, seconds: 4, decimals: 4 })
     expect(millisecondsToDhms(3723400)).to.deep.equal({ negative: 0, days: 0, hours: 1, minutes: 2, seconds: 4, decimals: 4 })
     expect(millisecondsToDhms(3600000)).to.deep.equal({ negative: 0, days: 0, hours: 1, minutes: 0, seconds: 0, decimals: 0 })
@@ -41,7 +41,23 @@ describe('timeUtils', () => {
     expect(millisecondsToDhms(-97323400)).to.deep.equal({ negative: 1, days: 1, hours: 3, minutes: 2, seconds: 3, decimals: 4 })
   })
 
-  test('dhmsToMilliseconds', () => {
+  test('millisecondsToDhms ceil = false', () => {
+    const opt = { ceil: false }
+    expect(millisecondsToDhms(97323400, opt)).to.deep.equal({ negative: 0, days: 1, hours: 3, minutes: 2, seconds: 3, decimals: 4 })
+    expect(millisecondsToDhms(3723400, opt)).to.deep.equal({ negative: 0, days: 0, hours: 1, minutes: 2, seconds: 3, decimals: 4 })
+    expect(millisecondsToDhms(3600000, opt)).to.deep.equal({ negative: 0, days: 0, hours: 1, minutes: 0, seconds: 0, decimals: 0 })
+    expect(millisecondsToDhms(60000, opt)).to.deep.equal({ negative: 0, days: 0, hours: 0, minutes: 1, seconds: 0, decimals: 0 })
+    expect(millisecondsToDhms(1500, opt)).to.deep.equal({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 5 })
+    expect(millisecondsToDhms(1000, opt)).to.deep.equal({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 0 })
+    expect(millisecondsToDhms(500, opt)).to.deep.equal({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 0, decimals: 5 })
+    expect(millisecondsToDhms(0, opt)).to.deep.equal({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 0, decimals: 0 })
+    expect(millisecondsToDhms(-500, opt)).to.deep.equal({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 5 })
+    expect(millisecondsToDhms(-1000, opt)).to.deep.equal({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 0 })
+    expect(millisecondsToDhms(-1500, opt)).to.deep.equal({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 2, decimals: 5 })
+    expect(millisecondsToDhms(-97323400, opt)).to.deep.equal({ negative: 1, days: 1, hours: 3, minutes: 2, seconds: 4, decimals: 4 })
+  })
+
+  test('dhmsToMilliseconds ceil = true', () => {
     expect(dhmsToMilliseconds({ negative: 0, days: 1, hours: 3, minutes: 2, seconds: 4, decimals: 4 })).to.deep.equal(97323400)
     expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 1, minutes: 2, seconds: 4, decimals: 4 })).to.deep.equal(3723400)
     expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 1, minutes: 0, seconds: 0, decimals: 0 })).to.deep.equal(3600000)
@@ -54,6 +70,22 @@ describe('timeUtils', () => {
     expect(dhmsToMilliseconds({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 0 })).to.deep.equal(-1000)
     expect(dhmsToMilliseconds({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 5 })).to.deep.equal(-1500)
     expect(dhmsToMilliseconds({ negative: 1, days: 1, hours: 3, minutes: 2, seconds: 3, decimals: 4 })).to.deep.equal(-97323400)
+  })
+
+  test('dhmsToMilliseconds ceil = false', () => {
+    const ceil = false
+    expect(dhmsToMilliseconds({ negative: 0, days: 1, hours: 3, minutes: 2, seconds: 3, decimals: 4, ceil })).to.deep.equal(97323400)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 1, minutes: 2, seconds: 3, decimals: 4, ceil })).to.deep.equal(3723400)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 1, minutes: 0, seconds: 0, decimals: 0, ceil })).to.deep.equal(3600000)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 0, minutes: 1, seconds: 0, decimals: 0, ceil })).to.deep.equal(60000)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 5, ceil })).to.deep.equal(1500)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 0, ceil })).to.deep.equal(1000)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 0, decimals: 5, ceil })).to.deep.equal(500)
+    expect(dhmsToMilliseconds({ negative: 0, days: 0, hours: 0, minutes: 0, seconds: 0, decimals: 0, ceil })).to.deep.equal(0)
+    expect(dhmsToMilliseconds({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 5, ceil })).to.deep.equal(-500)
+    expect(dhmsToMilliseconds({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 1, decimals: 0, ceil })).to.deep.equal(-1000)
+    expect(dhmsToMilliseconds({ negative: 1, days: 0, hours: 0, minutes: 0, seconds: 2, decimals: 5, ceil })).to.deep.equal(-1500)
+    expect(dhmsToMilliseconds({ negative: 1, days: 1, hours: 3, minutes: 2, seconds: 4, decimals: 4, ceil })).to.deep.equal(-97323400)
   })
 
   test('hmsToMilliseconds', () => {
@@ -84,20 +116,23 @@ describe('timeUtils', () => {
   })
 
   test('applyDate', () => {
-    const date = new Date('2020-01-01T00:00:00.000Z')
+    const date = new Date('2020-01-01T10:30:00.000Z')
     const ymd = new Date('2020-01-01')
     expect(applyDate(null)).to.be.null
     expect(applyDate(date)).to.deep.equal(date)
-    expect(applyDate(date, '2020-01-01')).to.deep.equal(new Date('2020-01-01T00:00:00.000Z'))
-    expect(applyDate(date, '2023-01-01')).to.deep.equal(new Date('2023-01-01T00:00:00.000Z'))
-    expect(applyDate(date, '2020-03-01')).to.deep.equal(new Date('2020-03-01T00:00:00.000Z'))
-    expect(applyDate(date, '2020-01-03')).to.deep.equal(new Date('2020-01-03T00:00:00.000Z'))
-    expect(applyDate(date, new Date('2020-01-01T10:12:13.000Z'))).to.deep.equal(new Date('2020-01-01T00:00:00.000Z'))
-    expect(applyDate(date, new Date('2022-01-01T10:12:13.000Z'))).to.deep.equal(new Date('2022-01-01T00:00:00.000Z'))
-    expect(applyDate(date, new Date('2020-02-01T10:12:13.000Z'))).to.deep.equal(new Date('2020-02-01T00:00:00.000Z'))
-    expect(applyDate(date, new Date('2020-01-02T10:12:13.000Z'))).to.deep.equal(new Date('2020-01-02T00:00:00.000Z'))
+    expect(applyDate(date, '2020-01-01')).to.deep.equal(new Date('2020-01-01T10:30:00.000Z'))
+    expect(applyDate(date, '2023-01-01')).to.deep.equal(new Date('2023-01-01T10:30:00.000Z'))
+    expect(applyDate(date, '2020-03-01')).to.deep.equal(new Date('2020-03-01T10:30:00.000Z'))
+    expect(applyDate(date, '2020-01-03')).to.deep.equal(new Date('2020-01-03T10:30:00.000Z'))
+    expect(applyDate(date, '2020-02-02')).to.deep.equal(new Date('2020-02-02T10:30:00.000Z'))
+    expect(applyDate(date, new Date('2020-01-01T10:12:13.000Z'))).to.deep.equal(new Date('2020-01-01T10:30:00.000Z'))
+    expect(applyDate(date, new Date('2022-01-01T10:12:13.000Z'))).to.deep.equal(new Date('2022-01-01T10:30:00.000Z'))
+    expect(applyDate(date, new Date('2020-02-01T10:12:13.000Z'))).to.deep.equal(new Date('2020-02-01T10:30:00.000Z'))
+    expect(applyDate(date, new Date('2020-01-02T10:12:13.000Z'))).to.deep.equal(new Date('2020-01-02T10:30:00.000Z'))
     // Summer/Winter time change
     expect(applyDate('2020-01-01T10:15:00.000Z', '2020-05-05')).to.deep.equal(new Date('2020-05-05T10:15:00.000Z'))
+
+    expect(applyDate(new Date('2022-05-30T10:15:00.000Z'), '2020-02-02')).to.deep.equal(new Date('2020-02-02T10:15:00.000Z'))
   })
 
   test('parseDateAsToday', () => {
