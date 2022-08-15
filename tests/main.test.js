@@ -104,7 +104,8 @@ describe('timeUtils', () => {
   })
 
   test('parseDate', () => {
-    expect(parseDate(new Date())).to.deep.equal(new Date())
+    const tmpDate = new Date()
+    expect(parseDate(tmpDate)).to.deep.equal(tmpDate)
     expect(parseDate(new Date('invalid'))).to.be.null
     expect(parseDate(new Date(''))).to.be.null
     expect(parseDate(null)).to.be.null
@@ -132,6 +133,7 @@ describe('timeUtils', () => {
     expect(applyDate('2020-01-01T10:30:00.000Z', '2020-03-01')).to.deep.equal(new Date('2020-03-01T10:30:00.000Z'))
     expect(applyDate('2020-01-01T10:30:00.000Z', '2020-01-03')).to.deep.equal(new Date('2020-01-03T10:30:00.000Z'))
     expect(applyDate('2020-01-01T10:30:00.000Z', '2020-02-02')).to.deep.equal(new Date('2020-02-02T10:30:00.000Z'))
+    expect(applyDate('2022-03-08T15:00:00.000Z', '2022-03-09')).to.deep.equal(new Date('2022-03-09T15:00:00.000Z'))
 
     // with date object reference
     expect(applyDate('2020-01-01T10:30:00.000Z', new Date('2020-01-01T10:12:13.000Z'))).to.deep.equal(new Date('2020-01-01T10:30:00.000Z'))
