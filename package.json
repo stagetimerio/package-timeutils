@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
+    "test": "TZ='America/Los_Angeles' NODE_OPTIONS=--experimental-vm-modules jest; TZ='Europe/Berlin' NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "author": "Lukas Hermann <hey@lukashermann.dev>",
   "license": "ISC",

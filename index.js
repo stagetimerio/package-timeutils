@@ -1,5 +1,6 @@
 import parseISO from 'date-fns/parseISO'
 import addDays from 'date-fns/addDays'
+import format from 'date-fns/format'
 
 export function millisecondsToHms (ms = 0) {
   return {
@@ -62,35 +63,51 @@ export function parseDate (date) {
 
 /**
  * Apply year-month-day to a JS date
- * @param  {Date|string} date
- * @param  {Date|string} ymdDate
+ * @param  {Date|string} rawDateTime
+ * @param  {Date|string} rawReferenceDate
  * @return {Date}
  */
-export function applyDate (date, ymdDate) {
-  const parsed = parseDate(date)
-  const ymd = parseDate(ymdDate)
-  if (!isValidDate(parsed)) return null
-  if (!isValidDate(ymd)) return parsed
-  const clone = new Date(parsed)
-  clone.setDate(ymd.getDate())
-  clone.setMonth(ymd.getMonth())
-  clone.setFullYear(ymd.getFullYear())
-  clone.setUTCHours(parsed.getUTCHours())
-  return clone
+export function applyDate (rawDateTime, rawReferenceDate) {
+  const parsedDateTime = parseDate(rawDateTime)
+  const parsedReferenceDate = parseDate(rawReferenceDate)
+  if (!isValidDate(parsedDateTime)) return null
+  if (!isValidDate(parsedReferenceDate)) return parsedDateTime
+  const str = parsedReferenceDate.toISOString().split('T')[0] + 'T' + parsedDateTime.toISOString().split('T')[1]
+  return new Date(str)
 }
 
-export function parseDateAsToday (date, {
+/**
+ * [parseDateAsToday description]
+ * @param  {Date,String} inputDate           The timestamp to parse
+ * @param  {Date,String} options.reference   Used instead of 'Today'
+ * @param  {Number}      options.tollerance  If the date is so long in the past, it's considered as tomorrow
+ * @return {Date}
+ */
+export function parseDateAsToday (inputDate, {
   reference = null,
-  tollerance = 3 * 60 * 60 * 1000, // 6 hours
+  tollerance = 3 * 60 * 60 * 1000, // 3 hours
 } = {}) {
-  let parsed = parseDate(date)
-  if (!parsed) return null
+  if (typeof inputDate === 'boolean') return null
+  const parsedInput = parseDate(inputDate)
+  if (!isValidDate(parsedInput)) return null
   const parsedRef = parseDate(reference) || new Date()
-  parsed = applyDate(parsed, parsedRef)
-  while ((parsedRef - parsed) > tollerance) {
-    parsed = addDays(parsed, 1)
+  let output = applyDate(parsedInput, parsedRef)
+
+  // If the date is too long in the past from now (e.g. 10am, but now is 5pm)
+  // Then consider it as tomorrow
+  if ((parsedRef - output) > tollerance) {
+    return addDays(output, 1)
   }
-  return parsed
+
+  // If there is a day change and the hour difference is <3h (e.g. 11pm -> 1am)
+  // Then consider it as yesterday
+  const tolleranceInHours = tollerance / (60 * 60 * 1000)
+  const differenceInterDay = 24 - (parsedInput.getUTCHours() - parsedRef.getUTCHours())
+  if (differenceInterDay <= tolleranceInHours) {
+    return addDays(output, -1)
+  }
+
+  return output
 }
 
 export function timerToStartDate (timer) {

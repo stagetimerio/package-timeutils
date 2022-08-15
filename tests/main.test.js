@@ -14,7 +14,6 @@ import {
 import { format } from 'date-fns'
 
 const { expect } = chai
-const yyyyMMdd = format(new Date(), 'yyyy-MM-dd')
 
 describe('timeUtils', () => {
   test('millisecondsToHms', () => {
@@ -116,34 +115,72 @@ describe('timeUtils', () => {
   })
 
   test('applyDate', () => {
-    const date = new Date('2020-01-01T10:30:00.000Z')
-    const ymd = new Date('2020-01-01')
+    // Empty values
     expect(applyDate(null)).to.be.null
-    expect(applyDate(date)).to.deep.equal(date)
-    expect(applyDate(date, '2020-01-01')).to.deep.equal(new Date('2020-01-01T10:30:00.000Z'))
-    expect(applyDate(date, '2023-01-01')).to.deep.equal(new Date('2023-01-01T10:30:00.000Z'))
-    expect(applyDate(date, '2020-03-01')).to.deep.equal(new Date('2020-03-01T10:30:00.000Z'))
-    expect(applyDate(date, '2020-01-03')).to.deep.equal(new Date('2020-01-03T10:30:00.000Z'))
-    expect(applyDate(date, '2020-02-02')).to.deep.equal(new Date('2020-02-02T10:30:00.000Z'))
-    expect(applyDate(date, new Date('2020-01-01T10:12:13.000Z'))).to.deep.equal(new Date('2020-01-01T10:30:00.000Z'))
-    expect(applyDate(date, new Date('2022-01-01T10:12:13.000Z'))).to.deep.equal(new Date('2022-01-01T10:30:00.000Z'))
-    expect(applyDate(date, new Date('2020-02-01T10:12:13.000Z'))).to.deep.equal(new Date('2020-02-01T10:30:00.000Z'))
-    expect(applyDate(date, new Date('2020-01-02T10:12:13.000Z'))).to.deep.equal(new Date('2020-01-02T10:30:00.000Z'))
+    expect(applyDate(undefined)).to.be.null
+    expect(applyDate('a')).to.be.null
+    expect(applyDate(0)).to.deep.equal(new Date('1970-01-01T00:00:00.000Z'))
+
+    // without reference
+    expect(applyDate('2020-01-01T10:30:00.000Z')).to.deep.equal(new Date('2020-01-01T10:30:00.000Z'))
+
+    // with yyyy-mm-dd reference
+    expect(applyDate('2020-01-01T23:15:00.000Z', '2022-02-02')).to.deep.equal(new Date('2022-02-02T23:15:00.000Z'))
+    expect(applyDate('2020-01-01T23:15:00.000Z', '2023-03-03')).to.deep.equal(new Date('2023-03-03T23:15:00.000Z'))
+    expect(applyDate('2020-01-01T10:30:00.000Z', '2020-01-01')).to.deep.equal(new Date('2020-01-01T10:30:00.000Z'))
+    expect(applyDate('2020-01-01T10:30:00.000Z', '2023-01-01')).to.deep.equal(new Date('2023-01-01T10:30:00.000Z'))
+    expect(applyDate('2020-01-01T10:30:00.000Z', '2020-03-01')).to.deep.equal(new Date('2020-03-01T10:30:00.000Z'))
+    expect(applyDate('2020-01-01T10:30:00.000Z', '2020-01-03')).to.deep.equal(new Date('2020-01-03T10:30:00.000Z'))
+    expect(applyDate('2020-01-01T10:30:00.000Z', '2020-02-02')).to.deep.equal(new Date('2020-02-02T10:30:00.000Z'))
+
+    // with date object reference
+    expect(applyDate('2020-01-01T10:30:00.000Z', new Date('2020-01-01T10:12:13.000Z'))).to.deep.equal(new Date('2020-01-01T10:30:00.000Z'))
+    expect(applyDate('2020-01-01T10:30:00.000Z', new Date('2022-01-01T10:12:13.000Z'))).to.deep.equal(new Date('2022-01-01T10:30:00.000Z'))
+    expect(applyDate('2020-01-01T10:30:00.000Z', new Date('2020-02-01T10:12:13.000Z'))).to.deep.equal(new Date('2020-02-01T10:30:00.000Z'))
+    expect(applyDate('2020-01-01T10:30:00.000Z', new Date('2020-01-02T10:12:13.000Z'))).to.deep.equal(new Date('2020-01-02T10:30:00.000Z'))
+
     // Summer/Winter time change
     expect(applyDate('2020-01-01T10:15:00.000Z', '2020-05-05')).to.deep.equal(new Date('2020-05-05T10:15:00.000Z'))
 
     expect(applyDate(new Date('2022-05-30T10:15:00.000Z'), '2020-02-02')).to.deep.equal(new Date('2020-02-02T10:15:00.000Z'))
   })
 
-  test.only('parseDateAsToday (basics)', () => {
+  test('parseDateAsToday (basics)', () => {
+    // false inputs
+    expect(parseDateAsToday(true)).to.be.null
+    expect(parseDateAsToday(false)).to.be.null
     expect(parseDateAsToday(null)).to.be.null
     expect(parseDateAsToday(undefined)).to.be.null
-    expect(parseDateAsToday('2020-01-01T23:45:00.000Z')).to.deep.equal(new Date(yyyyMMdd + 'T23:45:00.000Z'))
+    expect(parseDateAsToday('a')).to.be.null
+
+    // parse with reference
+    expect(parseDateAsToday('2020-01-01T00:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T00:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T01:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T01:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T02:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T02:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T03:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T03:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T04:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T04:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T05:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T05:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T06:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T06:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T07:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T07:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T08:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T08:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T09:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T09:15:00.000Z'))
     expect(parseDateAsToday('2020-01-01T10:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T11:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T11:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T12:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T12:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T13:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T13:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T14:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T14:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T15:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T15:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T16:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T16:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T17:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T17:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T18:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T18:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T19:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T19:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T20:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-02T20:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T21:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-01T21:15:00.000Z'))
+    expect(parseDateAsToday('2020-01-01T22:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-01T22:15:00.000Z'))
     expect(parseDateAsToday('2020-01-01T23:15:00.000Z', { reference: '2022-02-02' })).to.deep.equal(new Date('2022-02-01T23:15:00.000Z'))
   })
 
-  test.only('parseDateAsToday (default tolerance 3h)', () => {
+  test('parseDateAsToday (default tolerance 3h)', () => {
     // Should be interpreted as the previous day
     expect(parseDateAsToday('2020-01-02T23:15:00.000Z', { reference: '2022-02-02T00:00:00.000Z' })).to.deep.equal(new Date('2022-02-01T23:15:00.000Z'))
     expect(parseDateAsToday('2020-01-02T23:15:00.000Z', { reference: '2022-02-02T01:00:00.000Z' })).to.deep.equal(new Date('2022-02-01T23:15:00.000Z'))
@@ -168,7 +205,7 @@ describe('timeUtils', () => {
     // expect(parseDateAsToday('2020-01-03T23:30:00.000Z', { reference: '2022-02-02T00:30:00.000Z' })).to.deep.equal(new Date('2022-02-01T23:30:00.000Z'))
   })
 
-  test.only('parseDateAsToday (custom tollerance 2h)', () => {
+  test('parseDateAsToday (custom tollerance 2h)', () => {
     const tollerance = 2 * 60 * 60 * 1000
     expect(parseDateAsToday('2020-01-01T10:15:00.000Z', { reference: '2022-02-02T10:00:00.000Z', tollerance })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
     expect(parseDateAsToday('2020-01-01T10:15:00.000Z', { reference: '2022-02-02T11:00:00.000Z', tollerance })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
@@ -178,6 +215,7 @@ describe('timeUtils', () => {
   })
 
   test('timerToStartDate', () => {
+    const yyyyMMdd = format(new Date(), 'yyyy-MM-dd')
     expect(timerToStartDate(null)).to.be.null
     expect(timerToStartDate(undefined)).to.be.null
     expect(timerToStartDate({})).to.be.null
@@ -187,6 +225,7 @@ describe('timeUtils', () => {
   })
 
   test('timerToFinishDate', () => {
+    const yyyyMMdd = format(new Date(), 'yyyy-MM-dd')
     expect(timerToFinishDate(null)).to.be.null
     expect(timerToFinishDate(undefined)).to.be.null
     expect(timerToFinishDate({})).to.be.null
