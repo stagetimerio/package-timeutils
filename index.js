@@ -1,6 +1,5 @@
 import parseISO from 'date-fns/parseISO/index.js'
 import addDays from 'date-fns/addDays/index.js'
-import format from 'date-fns/format/index.js'
 
 export function millisecondsToHms (ms = 0) {
   return {
