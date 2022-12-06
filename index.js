@@ -1,6 +1,7 @@
 import parseISO from 'date-fns/parseISO/index.js'
 import addDays from 'date-fns/addDays/index.js'
 import parse from 'date-fns/parse/index.js'
+import format from 'date-fns/format/index.js'
 
 export function millisecondsToHms (ms = 0) {
   return {
@@ -75,6 +76,11 @@ export function parseDate (date, { asUTC = false } = {}) {
   const parsedISO = parseISO(date)
   if (isValidDate(parsedISO)) return parsedISO
   return null
+}
+
+export function toYYYYMMDD (date, { asUTC = false } = {}) {
+  if (asUTC) return date.toISOString().split('T')[0]
+  else return format(date, 'yyyy-MM-dd')
 }
 
 /**
@@ -167,6 +173,7 @@ export default {
   hmsToMilliseconds,
   isValidDate,
   parseDate,
+  toYYYYMMDD,
   parseDateAsToday,
   applyDate,
   timerToStartDate,

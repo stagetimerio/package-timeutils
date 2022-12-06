@@ -10,6 +10,7 @@ import {
   parseDateAsToday,
   timerToStartDate,
   timerToFinishDate,
+  toYYYYMMDD,
 } from '../index.js'
 import { format, addDays, addMinutes } from 'date-fns'
 
@@ -149,6 +150,15 @@ describe('timeUtils', () => {
 
     expect(parseDate('2020-01-05T04:00:00', { asUTC: false }))
       .to.deep.equal(addMinutes(new Date('2020-01-05T04:00:00.000Z'), TZ.offset))
+  })
+
+  test('toYYYYMMDD', () => {
+    const at2AM = new Date('2020-01-05T02:00:00.000Z')
+    const at9PM = new Date('2020-01-05T21:00:00.000Z')
+    expect(toYYYYMMDD(at2AM, { asUTC: false })).to.equal(format(at2AM, 'yyyy-MM-dd'))
+    expect(toYYYYMMDD(at2AM, { asUTC: true })).to.equal('2020-01-05')
+    expect(toYYYYMMDD(at9PM, { asUTC: false })).to.equal(format(at9PM, 'yyyy-MM-dd'))
+    expect(toYYYYMMDD(at9PM, { asUTC: true })).to.equal('2020-01-05')
   })
 
   test('applyDate: Simple case', () => {
