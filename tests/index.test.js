@@ -305,7 +305,7 @@ describe('timeUtils', () => {
   })
 
   test('timerToStartDate', () => {
-    const yyyyMMdd = format(new Date(), 'yyyy-MM-dd')
+    const yyyyMMdd = toYYYYMMDD(new Date(), { asUTC: true })
     expect(timerToStartDate(null)).to.be.null
     expect(timerToStartDate(undefined)).to.be.null
     expect(timerToStartDate({})).to.be.null
@@ -315,7 +315,7 @@ describe('timeUtils', () => {
   })
 
   test('timerToFinishDate', () => {
-    const yyyyMMdd = format(new Date(), 'yyyy-MM-dd')
+    const yyyyMMdd = toYYYYMMDD(new Date(), { asUTC: true })
     expect(timerToFinishDate(null)).to.be.null
     expect(timerToFinishDate(undefined)).to.be.null
     expect(timerToFinishDate({})).to.be.null
