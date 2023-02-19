@@ -167,7 +167,7 @@ describe('timeUtils', () => {
     let inDate = parseDate('2011-02-12', { asUTC: false })
     let output = applyDate(inTime, inDate)
     let check = addMinutes(new Date('2011-02-12T05:48:00.000Z'), TZ.offset)
-    // console.log(`
+    // console.info(`
     //   TIME  = ${inTime} | ${inTime.toISOString()}
     //   DATE  = ${inDate} | ${inDate.toISOString()}
     //   OUT   = ${output} | ${output.toISOString()}
