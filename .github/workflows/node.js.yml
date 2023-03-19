@@ -10,27 +10,25 @@ on:
     branches: [ "master" ]
 
 jobs:
-  tests:
-
+  test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         timezone: [America/Los_Angeles, Europe/Berlin, Asia/Singapore]
 
     steps:
       - uses: actions/checkout@v3
+
       - name: Node 16
         uses: actions/setup-node@v3
         with:
           node-version: 16
           cache: 'npm'
 
-      # Install dependencies
-      - run: npm install
+      - name: Install Dependencies
+        run: npm install
 
-      # Run tests
-      - name: Run Test
+      - name: Run Tests
         run: npm run jest -- --ci 2>&1 | tee $GITHUB_STEP_SUMMARY
         env:
           TZ: ${{ matrix.node-version }}
