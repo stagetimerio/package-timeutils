@@ -9,7 +9,7 @@
     "test:LA": "TZ='America/Los_Angeles' NODE_OPTIONS=--experimental-vm-modules jest",
     "test:BER": "TZ='Europe/Berlin' NODE_OPTIONS=--experimental-vm-modules jest",
     "test:SG": "TZ='Asia/Singapore' NODE_OPTIONS=--experimental-vm-modules jest",
-    "jest": "jest"
+    "test:ci": "jest --ci"
   },
   "author": "Lukas Hermann <hey@lukashermann.dev>",
   "license": "ISC",
