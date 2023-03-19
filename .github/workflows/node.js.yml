@@ -16,15 +16,14 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [16.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+        timezone: [America/Los_Angeles, Europe/Berlin, Asia/Singapore]
 
     steps:
       - uses: actions/checkout@v3
-      - name: Node ${{ matrix.node-version }}
+      - name: Node 16
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 16
           cache: 'npm'
 
       # Install dependencies
@@ -34,4 +33,4 @@ jobs:
       - name: Run Test
         uses: ArtiomTr/jest-coverage-report-action@v2
         with:
-          test-script: npm run test
+          test-script: TZ='${{ matrix.node-version }}' NODE_OPTIONS=--experimental-vm-modules jest
