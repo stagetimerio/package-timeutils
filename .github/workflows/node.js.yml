@@ -29,7 +29,7 @@ jobs:
         run: npm install
 
       - name: Run Tests
-        run: TZ='${{ matrix.node-version }}' npm run test:ci 2>&1 | tee $GITHUB_STEP_SUMMARY; exit ${PIPESTATUS[0]}
+        run: npm run test:ci 2>&1 | tee $GITHUB_STEP_SUMMARY; exit ${PIPESTATUS[0]}
         env:
-          TZ: '${{ matrix.node-version }}'
+          TZ: ${{ matrix.timezone }}
           NODE_OPTIONS: --experimental-vm-modules
