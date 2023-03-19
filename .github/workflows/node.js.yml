@@ -31,7 +31,14 @@ jobs:
 
       # Run tests
       - name: Run Test
-        uses: ArtiomTr/jest-coverage-report-action@v2
+        run: jest >> $GITHUB_STEP_SUMMARY
         env:
           TZ: ${{ matrix.node-version }}
           NODE_OPTIONS: --experimental-vm-modules
+
+      # Run tests
+      # - name: Run Test
+      #   uses: ArtiomTr/jest-coverage-report-action@v2
+      #   env:
+      #     TZ: ${{ matrix.node-version }}
+      #     NODE_OPTIONS: --experimental-vm-modules
