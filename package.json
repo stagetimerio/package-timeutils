@@ -8,7 +8,8 @@
     "test": "npm run test:LA; npm run test:BER; npm run test:SG",
     "test:LA": "TZ='America/Los_Angeles' NODE_OPTIONS=--experimental-vm-modules jest",
     "test:BER": "TZ='Europe/Berlin' NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:SG": "TZ='Asia/Singapore' NODE_OPTIONS=--experimental-vm-modules jest"
+    "test:SG": "TZ='Asia/Singapore' NODE_OPTIONS=--experimental-vm-modules jest",
+    "jest": "jest"
   },
   "author": "Lukas Hermann <hey@lukashermann.dev>",
   "license": "ISC",
