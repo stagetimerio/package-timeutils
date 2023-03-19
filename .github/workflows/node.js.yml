@@ -31,7 +31,7 @@ jobs:
 
       # Run tests
       - name: Run Test
-        run: npm run jest >> $GITHUB_STEP_SUMMARY
+        run: npm run jest -- --ci 2>&1 | tee $GITHUB_STEP_SUMMARY
         env:
           TZ: ${{ matrix.node-version }}
           NODE_OPTIONS: --experimental-vm-modules
