@@ -31,5 +31,5 @@ jobs:
       - name: Run Tests
         run: npm run test:ci 2>&1 | tee $GITHUB_STEP_SUMMARY; exit ${PIPESTATUS[0]}
         env:
-          TZ: ${{ matrix.node-version }}
+          TZ: '${{ matrix.node-version }}'
           NODE_OPTIONS: --experimental-vm-modules
