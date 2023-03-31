@@ -13,8 +13,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        fail-fast: false
         timezone: [America/Los_Angeles, Europe/Berlin, Asia/Singapore]
 
     steps:
