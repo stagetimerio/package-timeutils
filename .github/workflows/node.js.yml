@@ -5,15 +5,16 @@ name: Node.js CI Tests
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ['master']
   pull_request:
-    branches: [ "master" ]
+    branches: ['master']
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        fail-fast: false
         timezone: [America/Los_Angeles, Europe/Berlin, Asia/Singapore]
 
     steps:
