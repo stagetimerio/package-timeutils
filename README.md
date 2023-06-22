@@ -3,5 +3,5 @@
 ## Install
 
 ```sh
-npm i lhermann/stagetimer-timeutils
+npm i @stagetimerio/timeutils
 ```
