@@ -2,7 +2,12 @@ import timerToStartDate from './timerToStartDate.js'
 import parseDateAsToday from './parseDateAsToday.js'
 import applyDate from './applyDate.js'
 
+//
+// DEPRECATED: Moved to stagetimer/server/utils/timeUtils.js
+//
+
 export default function timerToFinishDate (timer) {
+  console.infi('DEPRECATED @stagetimerio/timeutils/timerToFinishDate')
   if (!timer) return null
   const start = timerToStartDate(timer)
   let finish = null
