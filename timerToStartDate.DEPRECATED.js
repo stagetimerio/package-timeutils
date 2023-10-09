@@ -6,7 +6,7 @@ import applyDate from './applyDate.js'
 //
 
 export default function timerToStartDate (timer) {
-  console.infi('DEPRECATED @stagetimerio/timeutils/timerToStartDate')
+  console.info('DEPRECATED @stagetimerio/timeutils/timerToStartDate')
   if (!timer) return null
   let start = parseDateAsToday(timer.startTime)
   if (timer.startDate) start = applyDate(start, timer.startDate)

@@ -1,4 +1,4 @@
-import timerToStartDate from './timerToStartDate.js'
+import timerToStartDate from './timerToStartDate.DEPRECATED.js'
 import parseDateAsToday from './parseDateAsToday.js'
 import applyDate from './applyDate.js'
 
@@ -7,7 +7,7 @@ import applyDate from './applyDate.js'
 //
 
 export default function timerToFinishDate (timer) {
-  console.infi('DEPRECATED @stagetimerio/timeutils/timerToFinishDate')
+  console.info('DEPRECATED @stagetimerio/timeutils/timerToFinishDate')
   if (!timer) return null
   const start = timerToStartDate(timer)
   let finish = null
