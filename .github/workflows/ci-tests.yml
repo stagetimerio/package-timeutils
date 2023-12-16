@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        timezone: [America/Los_Angeles, Europe/Berlin, Asia/Singapore]
+        timezone: [America/Los_Angeles, Europe/Berlin, Australia/Sydney]
 
     steps:
       - uses: actions/checkout@v3
