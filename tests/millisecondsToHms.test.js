@@ -2,7 +2,7 @@ import { default as chai } from 'chai'
 import { millisecondsToHms } from '../index.js'
 const { expect } = chai
 
-describe('timeUtils.millisecondsToHms', () => {
+describe('millisecondsToHms', () => {
   test('0 milliseconds', () => {
     expect(millisecondsToHms(0)).to.deep.equal({ hours: 0, minutes: 0, seconds: 0, decimals: 0 })
   })

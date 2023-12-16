@@ -2,7 +2,7 @@ import { default as chai } from 'chai'
 import { millisecondsToDhms } from '../index.js'
 const { expect } = chai
 
-describe('timeUtils.millisecondsToDhms', () => {
+describe('millisecondsToDhms', () => {
   test('millisecondsToDhms ceil = true', () => {
     expect(millisecondsToDhms(97323400)).to.deep.equal({ negative: 0, days: 1, hours: 3, minutes: 2, seconds: 4, decimals: 4 })
     expect(millisecondsToDhms(3723400)).to.deep.equal({ negative: 0, days: 0, hours: 1, minutes: 2, seconds: 4, decimals: 4 })

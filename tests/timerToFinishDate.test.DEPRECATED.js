@@ -3,7 +3,7 @@ import { timerToFinishDate } from '../index.js'
 import { addDays } from 'date-fns'
 const { expect } = chai
 
-describe('timeUtils.timerToFinishDate', () => {
+describe('timerToFinishDate', () => {
   test('invalid input null', () => {
     expect(timerToFinishDate(null)).to.be.null
   })

@@ -6,7 +6,7 @@ const { expect } = chai
 const today = new Date()
 const tomorrow = addDays(new Date(), 1)
 
-describe('timeUtils.parseDateAsToday', () => {
+describe('parseDateAsToday', () => {
   test('Invalid inputs', () => {
     expect(parseDateAsToday(true)).to.be.null
     expect(parseDateAsToday(false)).to.be.null

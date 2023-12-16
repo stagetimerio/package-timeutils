@@ -2,7 +2,7 @@ import { default as chai } from 'chai'
 import { hmsToMilliseconds } from '../index.js'
 const { expect } = chai
 
-describe('timeUtils.hmsToMilliseconds', () => {
+describe('hmsToMilliseconds', () => {
   test('hmsToMilliseconds 0:00:00', () => {
     expect(hmsToMilliseconds({ hours: 0, minutes: 0, seconds: 0 })).to.equal(0)
   })

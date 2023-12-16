@@ -2,7 +2,7 @@ import { default as chai } from 'chai'
 import { isValidDate } from '../index.js'
 const { expect } = chai
 
-describe('timeUtils.isValidDate', () => {
+describe('isValidDate', () => {
   test('isValidDate new Date()', () => {
     expect(isValidDate(new Date())).to.be.true
   })

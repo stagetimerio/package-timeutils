@@ -3,7 +3,7 @@ import { applyDate } from '../index.js'
 import { addMinutes } from 'date-fns'
 const { expect } = chai
 
-describe('timeUtils.applyDate', () => {
+describe('applyDate', () => {
   test('Invalid data', () => {
     expect(applyDate(true)).to.be.null
     expect(applyDate(false)).to.be.null

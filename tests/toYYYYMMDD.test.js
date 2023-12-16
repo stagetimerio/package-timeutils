@@ -6,7 +6,7 @@ const { expect } = chai
 const at2AM = new Date('2020-01-05T02:00:00.000Z')
 const at9PM = new Date('2020-01-05T21:00:00.000Z')
 
-describe('timeUtils.toYYYYMMDD', () => {
+describe('toYYYYMMDD', () => {
   test('toYYYYMMDD, at2AM, asUTC=false', () => {
     expect(toYYYYMMDD(at2AM, { asUTC: false })).to.equal(format(at2AM, 'yyyy-MM-dd'))
   })

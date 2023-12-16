@@ -3,7 +3,7 @@ import { parseDate } from '../index.js'
 import { addMinutes } from 'date-fns'
 const { expect } = chai
 
-describe('timeUtils.parseDate', () => {
+describe('parseDate', () => {
   // Check invalid input
   test('Check invalid input', () => {
     expect(parseDate(true)).to.be.null
