@@ -1,7 +1,6 @@
-import { default as chai } from 'chai'
+import { expect } from 'chai'
 import { toYYYYMMDD } from '../index.js'
 import { format } from 'date-fns'
-const { expect } = chai
 
 const at2AM = new Date('2020-01-05T02:00:00.000Z')
 const at9PM = new Date('2020-01-05T21:00:00.000Z')

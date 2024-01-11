@@ -1,7 +1,6 @@
-import { default as chai } from 'chai'
+import { expect } from 'chai'
 import { parseDateAsToday } from '../index.js'
 import { addDays } from 'date-fns'
-const { expect } = chai
 
 const today = new Date()
 const tomorrow = addDays(new Date(), 1)

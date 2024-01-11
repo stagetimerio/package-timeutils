@@ -1,6 +1,5 @@
-import { default as chai } from 'chai'
+import { expect } from 'chai'
 import { isValidDate } from '../index.js'
-const { expect } = chai
 
 describe('isValidDate', () => {
   test('isValidDate new Date()', () => {

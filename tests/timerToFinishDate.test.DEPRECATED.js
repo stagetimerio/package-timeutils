@@ -1,7 +1,6 @@
-import { default as chai } from 'chai'
+import { expect } from 'chai'
 import { timerToFinishDate } from '../index.js'
 import { addDays } from 'date-fns'
-const { expect } = chai
 
 describe('timerToFinishDate', () => {
   test('invalid input null', () => {

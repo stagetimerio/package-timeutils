@@ -1,6 +1,5 @@
-import { default as chai } from 'chai'
+import { expect } from 'chai'
 import { millisecondsToHms } from '../index.js'
-const { expect } = chai
 
 describe('millisecondsToHms', () => {
   test('0 milliseconds', () => {

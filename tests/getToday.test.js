@@ -1,6 +1,5 @@
-import { default as chai } from 'chai'
+import { expect } from 'chai'
 import { getToday } from '../index.js'
-const { expect } = chai
 
 describe('applyDate', () => {
   test('default timezone', () => {

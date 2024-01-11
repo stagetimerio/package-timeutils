@@ -1,7 +1,6 @@
-import { default as chai } from 'chai'
+import { expect } from 'chai'
 import { applyDate } from '../index.js'
 import { addMinutes } from 'date-fns'
-const { expect } = chai
 
 describe('applyDate', () => {
   test('Invalid data', () => {
