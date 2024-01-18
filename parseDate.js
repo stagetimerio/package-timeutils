@@ -6,9 +6,10 @@ import addMilliseconds from 'date-fns/addMilliseconds'
 import isValidDate from './isValidDate.js'
 
 /**
- * [parseDate description]
+ * Try parsing the input as date or date string in the most sensible way
+ *
  * @param  {any} date - date string to parse
- * @param  {string} [timezone] - uses system timezone if empty
+ * @param  {string} [timezone] - uses system timezone if empty, only relevant for yyyy-MM-dd strings
  * @return {Date|null}
  */
 export default function parseDate (date, tz = undefined) {

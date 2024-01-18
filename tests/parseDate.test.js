@@ -73,21 +73,4 @@ describe('parseDate', () => {
     const tz = 'Australia/Sydney'
     expect(parseDate('2020-03-03', tz)).to.deep.equal(new Date('2020-03-03T11:00:00.000Z'))
   })
-
-  // test('Parse strings correctly', () => {
-  //   // Note: we need the TZ offset from the validation date, otherwise we may get an offset with DST
-  //   const tzOffset = new Date('2020-03-03T00:00:00.000Z').getTimezoneOffset()
-  //   expect(parseDate('2020-03-03')).to.deep.equal(addMinutes(new Date('2020-03-03T00:00:00.000Z'), tzOffset))
-  //   expect(parseDate('2020-03-03T00:00:00')).to.deep.equal(addMinutes(new Date('2020-03-03T00:00:00.000Z'), tzOffset))
-  //   expect(parseDate('2020-03-03T00:00:00.000Z')).to.deep.equal(addMinutes(new Date('2020-03-03T00:00:00.000Z'), 0))
-  //   expect(parseDate('2020-03-03T00:00:00.000+00:00')).to.deep.equal(addMinutes(new Date('2020-03-03T00:00:00.000Z'), 0))
-  // })
-
-  // test('Validate parameter `asUTC`', () => {
-  //   const tzOffset = new Date('2020-01-05T00:00:00.000Z').getTimezoneOffset()
-  //   expect(parseDate('2020-01-05', { asUTC: true })).to.deep.equal(addMinutes(new Date('2020-01-05T00:00:00.000Z'), 0))
-  //   expect(parseDate('2020-01-05', { asUTC: false })).to.deep.equal(addMinutes(new Date('2020-01-05T00:00:00.000Z'), tzOffset))
-  //   expect(parseDate('2020-01-05T04:00:00', { asUTC: true })).to.deep.equal(addMinutes(new Date('2020-01-05T04:00:00.000Z'), 0))
-  //   expect(parseDate('2020-01-05T04:00:00', { asUTC: false })).to.deep.equal(addMinutes(new Date('2020-01-05T04:00:00.000Z'), tzOffset))
-  // })
 })
