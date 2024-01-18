@@ -7,6 +7,18 @@ describe('applyDate', () => {
     expect(today.toISOString()).to.equal('2023-12-16T00:00:00.000Z')
   })
 
+  test('UTC', () => {
+    const tz = 'UTC'
+
+    // Mon Oct 02 2023 23:30:00 GMT+0200 (UTC)
+    const today1 = getToday(tz, new Date('2023-10-02T23:30:00.000Z'))
+    expect(today1.toISOString()).to.equal('2023-10-02T00:00:00.000Z')
+
+    // Tue Oct 03 2023 01:30:00 GMT+0000 (UTC)
+    const today2 = getToday(tz, new Date('2023-10-03T01:30:00.000Z'))
+    expect(today2.toISOString()).to.equal('2023-10-03T00:00:00.000Z')
+  })
+
   test('Europe/Berlin', () => {
     const tz = 'Europe/Berlin'
 
