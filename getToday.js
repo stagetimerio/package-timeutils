@@ -9,6 +9,9 @@ import addMilliseconds from 'date-fns/addMilliseconds'
  * @return {Date}
  */
 export default function getToday (timezone = undefined, now = undefined) {
+  if (now !== undefined && !(now instanceof Date)) {
+    throw new Error('The 2nd argument must be undefined or an instance of date.')
+  }
   const today = now || new Date()
   const tzOffset = timezone ? getTimezoneOffset(timezone, today) : 0
   const zoned = addMilliseconds(today, tzOffset)

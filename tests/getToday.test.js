@@ -2,8 +2,17 @@ import { expect } from 'chai'
 import { getToday } from '../index.js'
 
 describe('applyDate', () => {
+  test('no and invalid arguments', () => {
+    expect(getToday()).to.be.an.instanceof(Date)
+    expect(getToday('a')).to.be.an.instanceof(Date)
+    expect(getToday('UTC')).to.be.an.instanceof(Date)
+    expect(() => getToday('UTC', true)).to.throw()
+    expect(() => getToday('UTC', null)).to.throw()
+    expect(() => getToday('UTC', '2023-12-16T12:44:43.252Z')).to.throw()
+  })
+
   test('default timezone', () => {
-    const today = getToday(undefined, '2023-12-16T12:44:43.252Z')
+    const today = getToday(undefined, new Date('2023-12-16T12:44:43.252Z'))
     expect(today.toISOString()).to.equal('2023-12-16T00:00:00.000Z')
   })
 
@@ -43,7 +52,7 @@ describe('applyDate', () => {
     expect(today2.toISOString()).to.equal('2023-10-03T00:00:00.000Z')
   })
 
-  test.only('Australia/Sydney', () => {
+  test('Australia/Sydney', () => {
     const tz = 'Australia/Sydney'
 
     // Mon Oct 02 2023 23:30:00 GMT+1100 (Australian Eastern Daylight Time)
