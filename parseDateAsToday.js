@@ -1,39 +1,50 @@
-import addDays from 'date-fns/addDays/index.js'
-import isValidDate from './isValidDate.js'
 import parseDate from './parseDate.js'
 import applyDate from './applyDate.js'
+import addDays from 'date-fns/addDays/index.js'
 
 /**
- * [parseDateAsToday description]
- * @param  {Date,String} inputDate           The timestamp to parse
- * @param  {Date,String} options.reference   Used instead of 'Today'
- * @param  {Number}      options.tollerance  If the date is so long in the past, it's considered as tomorrow
- * @param  {Boolean}     options.asUTC       How to handle partial date strings
- * @return {Date}
+ * Parses a given timestamp and sets it as today's date, with adjustments based on provided options.
+ *
+ * @param {Date | string} rawInput - The timestamp to parse. Can be a Date object or a string representing a date.
+ * @param {Object} options - Optional parameters to refine the parsing behavior.
+ * @param {string} [options.timezone] - The timezone to consider for parsing. If not provided, the system's timezone is used.
+ * @param {Date} [options.after] - Ensures the parsed date is after this date. If the parsed date is earlier, it's adjusted to the next day.
+ * @param {Date} [options.now] - A specific date to consider as 'today', primarily used for testing. Defaults to the current date if not provided.
+ * @returns {Date} - The parsed and adjusted date as per the provided options.
+ *
+ * @example
+ * // For a scenario where you need to parse a time as today's date in a specific timezone
+ * parseDateAsToday('10:00', { timezone: 'Europe/Berlin' });
+ *
+ * @example
+ * // When ensuring the parsed date is after a certain date
+ * parseDateAsToday('10:00', { after: new Date('2022-01-01') });
+ *
+ * @throws {Error} - Throws an error if 'after' or 'now' options are provided but are not valid Date instances.
  */
-export default function parseDateAsToday (inputDate, {
-  reference = null,
-  tollerance = 3 * 60 * 60 * 1000, // 3 hours
-  asUTC = false,
+export default function parseDateAsToday (rawInput, {
+  timezone = undefined,
+  after = undefined,
+  now = undefined,
 } = {}) {
-  const parsedInput = parseDate(inputDate, { asUTC })
-  if (!isValidDate(parsedInput)) return null
-  const parsedRef = parseDate(reference, { asUTC }) || new Date()
-  let output = applyDate(parsedInput, parsedRef)
-
-  // If the date is too long in the past from now (e.g. 10am, but now is 5pm)
-  // Then consider it as tomorrow
-  if ((parsedRef - output) > tollerance) {
-    return addDays(output, 1)
+  // Validate parameters
+  if (after !== undefined && !(after instanceof Date)) {
+    throw new Error('The `after` argument must be undefined or an instance of Date.')
+  }
+  if (now !== undefined && !(now instanceof Date)) {
+    throw new Error('The `now` argument must be undefined or an instance of Date.')
   }
 
-  // If there is a day change and the hour difference is <3h (e.g. 11pm -> 1am)
-  // Then consider it as yesterday
-  const tolleranceInHours = tollerance / (60 * 60 * 1000)
-  const differenceInterDay = 24 - (parsedInput.getHours() - parsedRef.getHours())
-  if (differenceInterDay <= tolleranceInHours) {
-    return addDays(output, -1)
-  }
+  // Parse input
+  const today = now || new Date()
+  const parsedInput = parseDate(rawInput, timezone)
+
+  // Consider the `after` date when applying the date
+  const dateToApply = after && after > today ? after : today
+  let output = applyDate(parsedInput, dateToApply, timezone)
+
+  // Double-check if the output is really after `after`, otherwise add one day
+  if (output < after) output = addDays(output, 1)
 
   return output
 }

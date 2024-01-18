@@ -1,9 +1,5 @@
 import { expect } from 'chai'
 import { parseDateAsToday } from '../index.js'
-import { addDays } from 'date-fns'
-
-const today = new Date()
-const tomorrow = addDays(new Date(), 1)
 
 describe('parseDateAsToday', () => {
   test('Invalid inputs', () => {
@@ -14,80 +10,125 @@ describe('parseDateAsToday', () => {
     expect(parseDateAsToday('a')).to.be.null
   })
 
-  test('ISO string input, tolerance 0h', () => {
-    const input = new Date('2020-01-01T00:15:00.000Z')
-    const output = parseDateAsToday('2020-01-01T00:15:00.000Z', { tollerance: 0 })
-    expect(output.toLocaleTimeString()).to.equal(input.toLocaleTimeString())
-    expect(output.toLocaleDateString()).to.be.oneOf([today.toLocaleDateString(), tomorrow.toLocaleDateString()])
+  test('Simple case (w/o timezone)', () => {
+    const input = '2023-07-16T23:30:00.000Z' // Sun Jul 16 2023 23:30:00 GMT+0000 (Coordinated Universal Time)
+    const now = '2023-08-02T13:00:00.000Z' // Wed Aug 02 2023 13:00:00 GMT+0000 (Coordinated Universal Time)
+    const output = parseDateAsToday(input, { now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2023-08-02T23:30:00.000Z')) // Wed Aug 02 2023 23:30:00 GMT+0000 (Coordinated Universal Time)
   })
 
-  test('Date input, tolerance 0h', () => {
-    const input = new Date('2020-01-01T00:15:00.000Z')
-    const output = parseDateAsToday(input, { tollerance: 0 })
-    expect(output.toLocaleTimeString()).to.equal(input.toLocaleTimeString())
-    expect(output.toLocaleDateString()).to.be.oneOf([today.toLocaleDateString(), tomorrow.toLocaleDateString()])
+  test('Simple case (UTC)', () => {
+    const timezone = 'UTC'
+    const input = '2023-07-16T23:30:00.000Z' // Sun Jul 16 2023 23:30:00 GMT+0000 (Coordinated Universal Time)
+    const now = '2023-08-02T13:00:00.000Z' // Wed Aug 02 2023 13:00:00 GMT+0000 (Coordinated Universal Time)
+    const output = parseDateAsToday(input, { timezone, now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2023-08-02T23:30:00.000Z')) // Wed Aug 02 2023 23:30:00 GMT+0000 (Coordinated Universal Time)
   })
 
-  test('ISO string input, custom reference, tollerance 3h', () => {
-    const opt = {
-      reference: '2022-02-02T00:00:00.000Z',
-      tollerance: 3 * 60 * 60 * 1000, // 3 hours
-    }
-
-    expect(parseDateAsToday('2020-01-01T00:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T00:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T01:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T01:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T02:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T02:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T03:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T03:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T04:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T04:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T05:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T05:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T06:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T06:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T07:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T07:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T08:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T08:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T09:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T09:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T10:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T11:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T11:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T12:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T12:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T13:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T13:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T14:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T14:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T15:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T15:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T16:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T16:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T17:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T17:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T18:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T18:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T19:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T19:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T20:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-02T20:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T21:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-01T21:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T22:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-01T22:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T23:15:00.000Z', opt)).to.deep.equal(new Date('2022-02-01T23:15:00.000Z'))
+  test('Simple case (Europe/Berlin)', () => {
+    const timezone = 'Europe/Berlin'
+    const input = '2023-07-16T23:30:00.000Z' // Mon Jul 17 2023 01:30:00 GMT+0200 (Central European Summer Time)
+    const now = '2023-08-02T13:00:00.000Z' // Wed Aug 02 2023 15:00:00 GMT+0200 (Central European Summer Time)
+    const output = parseDateAsToday(input, { timezone, now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2023-08-01T23:30:00.000Z')) // Thu Aug 03 2023 01:30:00 GMT+0200 (Central European Summer Time)
   })
 
-  test('Default tolerance 3h', () => {
-    // Should be interpreted as the previous day
-    expect(parseDateAsToday('2020-01-02T23:15:00.000Z', { reference: '2022-02-02T00:00:00.000Z' })).to.deep.equal(new Date('2022-02-01T23:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-02T23:15:00.000Z', { reference: '2022-02-02T01:00:00.000Z' })).to.deep.equal(new Date('2022-02-01T23:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-02T23:15:00.000Z', { reference: '2022-02-02T02:00:00.000Z' })).to.deep.equal(new Date('2022-02-01T23:15:00.000Z'))
-
-    // Should be interpreted as the same day in the future
-    expect(parseDateAsToday('2020-01-02T23:15:00.000Z', { reference: '2022-02-02T03:00:00.000Z' })).to.deep.equal(new Date('2022-02-02T23:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-03T10:15:00.000Z', { reference: '2022-02-02T08:00:00.000Z' })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-03T10:15:00.000Z', { reference: '2022-02-02T09:00:00.000Z' })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-03T10:15:00.000Z', { reference: '2022-02-02T10:00:00.000Z' })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
-
-    // Should be interpreted as the same day in the past
-    expect(parseDateAsToday('2020-01-03T10:15:00.000Z', { reference: '2022-02-02T11:00:00.000Z' })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-03T10:15:00.000Z', { reference: '2022-02-02T12:00:00.000Z' })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-03T10:15:00.000Z', { reference: '2022-02-02T13:00:00.000Z' })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
-
-    // Should be interpreted as the next day in the future
-    expect(parseDateAsToday('2020-01-03T10:15:00.000Z', { reference: '2022-02-02T14:00:00.000Z' })).to.deep.equal(new Date('2022-02-03T10:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-03T10:15:00.000Z', { reference: '2022-02-02T15:00:00.000Z' })).to.deep.equal(new Date('2022-02-03T10:15:00.000Z'))
+  test('Simple case (America/Los_Angeles)', () => {
+    const timezone = 'America/Los_Angeles'
+    const input = '2023-07-16T23:30:00.000Z' // Sun Jul 16 2023 16:30:00 GMT-0700 (Pacific Daylight Time)
+    const now = '2023-08-02T13:00:00.000Z' // Wed Aug 02 2023 06:00:00 GMT-0700 (Pacific Daylight Time)
+    const output = parseDateAsToday(input, { timezone, now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2023-08-02T23:30:00.000Z')) // Wed Aug 02 2023 16:30:00 GMT-0700 (Pacific Daylight Time)
   })
 
-  test('Custom tollerance 2h', () => {
-    const tollerance = 2 * 60 * 60 * 1000
-    expect(parseDateAsToday('2020-01-01T10:15:00.000Z', { reference: '2022-02-02T10:00:00.000Z', tollerance })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T10:15:00.000Z', { reference: '2022-02-02T11:00:00.000Z', tollerance })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T10:15:00.000Z', { reference: '2022-02-02T12:00:00.000Z', tollerance })).to.deep.equal(new Date('2022-02-02T10:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T10:15:00.000Z', { reference: '2022-02-02T13:00:00.000Z', tollerance })).to.deep.equal(new Date('2022-02-03T10:15:00.000Z'))
-    expect(parseDateAsToday('2020-01-01T10:15:00.000Z', { reference: '2022-02-02T14:00:00.000Z', tollerance })).to.deep.equal(new Date('2022-02-03T10:15:00.000Z'))
+  test('Simple case (Australia/Sydney)', () => {
+    const timezone = 'Australia/Sydney'
+    const input = '2023-07-16T23:30:00.000Z' // Mon Jul 17 2023 09:30:00 GMT+1000 (Australian Eastern Standard Time)
+    const now = '2023-08-02T13:00:00.000Z' // Wed Aug 02 2023 23:00:00 GMT+1000 (Australian Eastern Standard Time)
+    const output = parseDateAsToday(input, { timezone, now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2023-08-01T23:30:00.000Z')) // Thu Aug 03 2023 09:30:00 GMT+1000 (Australian Eastern Standard Time)
+  })
+
+  test('US DST change March 12 (w/o timezone)', () => {
+    const input = '2023-03-09T02:30:00.000Z' // Thu Mar 09 2023 02:30:00 GMT+0000 (Coordinated Universal Time)
+    const now = '2023-03-14T13:00:00.000Z' // Tue Mar 14 2023 13:00:00 GMT+0000 (Coordinated Universal Time)
+    const output = parseDateAsToday(input, { now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2023-03-14T02:30:00.000Z')) // Tue Mar 14 2023 02:30:00 GMT+0000 (Coordinated Universal Time)
+  })
+
+  test('US DST change March 12 (UTC)', () => {
+    const timezone = 'UTC'
+    const input = '2023-03-09T02:30:00.000Z' // Thu Mar 09 2023 02:30:00 GMT+0000 (Coordinated Universal Time)
+    const now = '2023-03-14T13:00:00.000Z' // Tue Mar 14 2023 13:00:00 GMT+0000 (Coordinated Universal Time)
+    const output = parseDateAsToday(input, { timezone, now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2023-03-14T02:30:00.000Z')) // Tue Mar 14 2023 02:30:00 GMT+0000 (Coordinated Universal Time)
+  })
+
+  test('US DST change March 12 (Europe/Berlin)', () => {
+    const timezone = 'Europe/Berlin'
+    const input = '2023-03-09T02:30:00.000Z' // Thu Mar 09 2023 03:30:00 GMT+0100 (Central European Standard Time)
+    const now = '2023-03-14T13:00:00.000Z' // Tue Mar 14 2023 14:00:00 GMT+0100 (Central European Standard Time)
+    const output = parseDateAsToday(input, { timezone, now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2023-03-14T02:30:00.000Z')) // Tue Mar 14 2023 03:30:00 GMT+0100 (Central European Standard Time)
+  })
+
+  test('US DST change March 12 (America/Los_Angeles)', () => {
+    const timezone = 'America/Los_Angeles'
+    const input = '2023-03-09T02:30:00.000Z' // Wed Mar 08 2023 18:30:00 GMT-0800 (Pacific Standard Time)
+    const now = '2023-03-14T13:00:00.000Z' // Tue Mar 14 2023 06:00:00 GMT-0700 (Pacific Daylight Time)
+    const output = parseDateAsToday(input, { timezone, now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2023-03-15T02:30:00.000Z')) // Tue Mar 14 2023 19:30:00 GMT-0700 (Pacific Daylight Time)
+  })
+
+  test('US DST change March 12 (Australia/Sydney)', () => {
+    const timezone = 'Australia/Sydney'
+    const input = '2023-03-09T02:30:00.000Z' // Thu Mar 09 2023 13:30:00 GMT+1100 (Australian Eastern Daylight Time)
+    const now = '2023-03-14T13:00:00.000Z' // Wed Mar 15 2023 00:00:00 GMT+1100 (Australian Eastern Daylight Time)
+    const output = parseDateAsToday(input, { timezone, now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2023-03-15T02:30:00.000Z')) // Wed Mar 15 2023 13:30:00 GMT+1100 (Australian Eastern Daylight Time)
+  })
+
+  test('With after date (w/o timezone)', () => {
+    const input = '2023-06-09T19:30:00.000Z' // Fri Jun 09 2023 19:30:00 GMT+0000 (Coordinated Universal Time)
+    const now = '2024-10-07T17:13:49.000Z' // Mon Oct 07 2024 17:13:49 GMT+0000 (Coordinated Universal Time)
+    const after = '2024-10-08T01:30:00.000Z' // Tue Oct 08 2024 12:30:00 GMT+1100 (Australian Eastern Daylight Time)
+    const output = parseDateAsToday(input, { after: new Date(after), now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2024-10-08T19:30:00.000Z')) // Tue Oct 08 2024 19:30:00 GMT+0000 (Coordinated Universal Time)
+  })
+
+  test('With after date (UTC)', () => {
+    const timezone = 'UTC'
+    const input = '2023-06-09T19:30:00.000Z' // Fri Jun 09 2023 19:30:00 GMT+0000 (Coordinated Universal Time)
+    const now = '2024-10-07T17:13:49.000Z' // Mon Oct 07 2024 17:13:49 GMT+0000 (Coordinated Universal Time)
+    const after = '2024-10-08T01:30:00.000Z' // Tue Oct 08 2024 12:30:00 GMT+1100 (Australian Eastern Daylight Time)
+    const output = parseDateAsToday(input, { timezone, after: new Date(after), now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2024-10-08T19:30:00.000Z')) // Tue Oct 08 2024 19:30:00 GMT+0000 (Coordinated Universal Time)
+  })
+
+  test('With after date (Europe/Berlin)', () => {
+    const timezone = 'Europe/Berlin'
+    const input = '2023-06-09T19:30:00.000Z' // Fri Jun 09 2023 21:30:00 GMT+0200 (Central European Summer Time)
+    const now = '2024-10-07T17:13:49.000Z' // Mon Oct 07 2024 19:13:49 GMT+0200 (Central European Summer Time)
+    const after = '2024-10-08T01:30:00.000Z' // Tue Oct 08 2024 03:30:00 GMT+0200 (Central European Summer Time)
+    const output = parseDateAsToday(input, { timezone, after: new Date(after), now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2024-10-08T19:30:00.000Z')) // Tue Oct 08 2024 21:30:00 GMT+0200 (Coordinated Universal Time)
+  })
+
+  test('With after date (America/Los_Angeles)', () => {
+    const timezone = 'America/Los_Angeles'
+    const input = '2023-06-09T19:30:00.000Z' // Fri Jun 09 2023 12:30:00 GMT-0700 (Pacific Daylight Time)
+    const now = '2024-10-07T17:13:49.000Z' // Mon Oct 07 2024 10:13:49 GMT-0700 (Pacific Daylight Time)
+    const after = '2024-10-08T01:30:00.000Z' // Mon Oct 07 2024 18:30:00 GMT-0700 (Pacific Daylight Time)
+    const output = parseDateAsToday(input, { timezone, after: new Date(after), now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2024-10-08T19:30:00.000Z')) // Tue Oct 08 2024 12:30:00 GMT-0700 (Pacific Daylight Time)
+  })
+
+  test('With after date (Australia/Sydney)', () => {
+    const timezone = 'Australia/Sydney'
+    const input = '2023-06-09T19:30:00.000Z' // Sat Jun 10 2023 05:30:00 GMT+1000 (Australian Eastern Standard Time)
+    const now = '2024-10-07T17:13:49.000Z' // Tue Oct 08 2024 04:13:49 GMT+1100 (Australian Eastern Daylight Time)
+    const after = '2024-10-08T01:30:00.000Z' // Tue Oct 08 2024 12:30:00 GMT+1100 (Australian Eastern Daylight Time)
+    const output = parseDateAsToday(input, { timezone, after: new Date(after), now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2024-10-08T19:30:00.000Z')) // Wed Oct 09 2024 06:30:00 GMT+1100 (Australian Eastern Daylight Time)
   })
 })
