@@ -118,7 +118,7 @@ export default {
   'Guyana Time': 'GYT',
   'Hawaii Standard Time': 'HST',
   'Hawaii-Aleutian Daylight Time': 'HDT',
-  'Hawaii-Aleutian Time': 'HAST',
+  'Hawaii-Aleutian Standard Time': 'HAST',
   'Hong Kong Time': 'HKT',
   'Hotel Time Zone': 'H',
   'Hovd Summer Time': 'HOVST',
@@ -270,5 +270,5 @@ export default {
   'Yekaterinburg Summer Time': 'YEKST',
   'Yekaterinburg Time': 'YEKT',
   'Yukon Time': 'YT',
-  'Zulu Time Zone': 'Z'
+  'Zulu Time Zone': 'Z',
 }
