@@ -4,11 +4,10 @@ import abbreviations from './abbreviations.js'
  * Formats an IANA timezone string into a specified representation.
  *
  * @param {string} timezone - The IANA timezone string, e.g., 'America/Los_Angeles'.
- * @param {Object} options - Options for the formatting.
- * @param {string|string[]} options.format - One of 'long', 'abbr', 'offset', or an array of these values.
+ * @param {string|string[]} format - One of 'long', 'abbr', 'offset', or an array of these values.
  * @return {string} The formatted timezone string.
  */
-export default function formatTimezone (timezone, { format = 'long' } = {}) {
+export default function formatTimezone (timezone, format = 'long') {
   const date = new Date()
   const formatOpts = { timeZone: timezone }
 
@@ -16,6 +15,10 @@ export default function formatTimezone (timezone, { format = 'long' } = {}) {
 
   for (let fmt of formatArray) {
     switch (fmt) {
+    case 'city':
+      const parts = timezone.split('/')
+      return `${parts[0]} / ${parts.pop()}`.replace(/_/g, ' ')
+
     case 'long':
       formatOpts.timeZoneName = 'long'
       return new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1]
