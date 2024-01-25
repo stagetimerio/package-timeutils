@@ -5,8 +5,8 @@ name: Node.js Package
 
 on:
   push:
-    tags:
-      - '*'
+    tags: ['*']
+  workflow_dispatch:
 
 jobs:
   build:
