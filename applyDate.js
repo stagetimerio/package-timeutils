@@ -32,19 +32,15 @@ export default function applyDate (time, date, timezone = undefined) {
   outputInZone.setUTCMonth(dateInZone.getUTCMonth())
   outputInZone.setUTCFullYear(dateInZone.getUTCFullYear())
 
-  // Compensate for DST shift (Feels wrong, let's see if it sticks)
-  const dstShift = dateOffset - timeOffset
-  if (dstShift !== 0) outputInZone = addMilliseconds(outputInZone, dstShift)
-
   // Change output from sepcified timezone back to UTC
   const inUTC = addMilliseconds(outputInZone, -getTimezoneOffset(tz, outputInZone))
 
   // console.log(
-  //   '[applyDate.js 1]',
-  //   { tz, dstShift },
-  //   { timeInUTC, timeInZone, off: getTimezoneOffset(tz, timeInUTC) },
-  //   { dateInUTC, dateInZone, off: getTimezoneOffset(tz, dateInUTC) },
-  //   { inZone, inUTC },
+  //   '[applyDate.js]',
+  //   { tz, dstShift: dateOffset - timeOffset },
+  //   { timeInUTC, timeInZone, timeOffset },
+  //   { dateInUTC, dateInZone, dateOffset },
+  //   { outputInZone, inUTC },
   // )
 
   return inUTC

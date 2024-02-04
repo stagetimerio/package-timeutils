@@ -77,7 +77,7 @@ describe('parseDateAsToday', () => {
     const input = '2023-03-09T02:30:00.000Z' // Wed Mar 08 2023 18:30:00 GMT-0800 (Pacific Standard Time)
     const now = '2023-03-14T13:00:00.000Z' // Tue Mar 14 2023 06:00:00 GMT-0700 (Pacific Daylight Time)
     const output = parseDateAsToday(input, { timezone, now: new Date(now) })
-    expect(output).to.deep.equal(new Date('2023-03-15T02:30:00.000Z')) // Tue Mar 14 2023 19:30:00 GMT-0700 (Pacific Daylight Time)
+    expect(output).to.deep.equal(new Date('2023-03-15T01:30:00.000Z')) // Tue Mar 14 2023 18:30:00 GMT-0700 (Pacific Daylight Time)
   })
 
   test('US DST change March 12 (Australia/Sydney)', () => {
@@ -129,6 +129,6 @@ describe('parseDateAsToday', () => {
     const now = '2024-10-07T17:13:49.000Z' // Tue Oct 08 2024 04:13:49 GMT+1100 (Australian Eastern Daylight Time)
     const after = '2024-10-08T01:30:00.000Z' // Tue Oct 08 2024 12:30:00 GMT+1100 (Australian Eastern Daylight Time)
     const output = parseDateAsToday(input, { timezone, after: new Date(after), now: new Date(now) })
-    expect(output).to.deep.equal(new Date('2024-10-08T19:30:00.000Z')) // Wed Oct 09 2024 06:30:00 GMT+1100 (Australian Eastern Daylight Time)
+    expect(output).to.deep.equal(new Date('2024-10-08T18:30:00.000Z')) // Wed Oct 09 2024 05:30:00 GMT+1100 (Australian Eastern Daylight Time)
   })
 })
