@@ -5,10 +5,10 @@ import abbreviations from './abbreviations.js'
  *
  * @param {string} timezone - The IANA timezone string, e.g., 'America/Los_Angeles'.
  * @param {string|string[]} format - One of 'long', 'abbr', 'offset', or an array of these values.
+ * @param {Date} date - The reference date used to determine the 'long', 'abbr' and 'offset'
  * @return {string} The formatted timezone string.
  */
-export default function formatTimezone (timezone, format = 'long') {
-  const date = new Date()
+export default function formatTimezone (timezone, format = 'long', date = new Date()) {
   const formatOpts = { timeZone: timezone }
 
   const formatArray = Array.isArray(format) ? format : [format]
