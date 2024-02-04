@@ -133,9 +133,9 @@ describe('applyDate', () => {
     expect(output).to.deep.equal(new Date('2023-10-01T14:10:00.000Z')) // Mon Oct 02 2023 01:10:00 GMT+1100 (Australian Eastern Daylight Time)
   })
 
-  test('Test from "Until Finish Time" bug', () => {
+  test('"Until Finish Time" bug – DST offset', () => {
     const tz = 'Europe/Berlin'
-    const today = new Date('2024-02-04T00:00:00.000Z')
+    const today = new Date('2024-02-03T23:00:00.000Z')
 
     // Pre DST date
     expect(applyDate(new Date('2023-10-15T21:30:00.000Z'), today, tz)).to.deep.equal(new Date('2024-02-04T22:30:00.000Z'))
@@ -143,4 +143,14 @@ describe('applyDate', () => {
     // Post DST date
     expect(applyDate(new Date('2023-12-15T21:30:00.000Z'), today, tz)).to.deep.equal(new Date('2024-02-04T21:30:00.000Z'))
   })
+
+  test('"Until Finish Time" bug – wrong date', () => {
+    const tz = 'America/Los_Angeles'
+    const today = new Date('2024-02-03T08:00:00.000Z') // Sat Feb 03 2024 00:00:00 GMT-0800 (Pacific Standard Time)
+
+    expect(applyDate(new Date('2023-10-15T21:30:00.000Z'), today, tz)).to.deep.equal(new Date('2024-02-03T22:30:00.000Z'))
+
+    expect(applyDate(new Date('2023-12-15T21:30:00.000Z'), today, tz)).to.deep.equal(new Date('2024-02-03T21:30:00.000Z'))
+  })
+
 })
