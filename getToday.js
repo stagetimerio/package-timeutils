@@ -3,7 +3,7 @@ import addMilliseconds from 'date-fns/addMilliseconds'
 import addMinutes from 'date-fns/addMinutes'
 
 /**
- * Get the Date of 0:00 today in the given timezone aware
+ * Get the Date of 0:00 today in the given timezone
  *
  * @param  {string} [timezone] - assumes 'UTC' if empty
  * @param  {Date} [now] - provide a date for 'today', must be in UTC, used for testing
