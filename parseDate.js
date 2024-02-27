@@ -23,8 +23,6 @@ import isValidDate from './isValidDate.js'
  * @example
  * // Parsing a full datetime string
  * parseDate('2023-01-01T12:00:00')
- *
- * @throws {Error} - Throws an error if date parsing fails or if an invalid date format is provided.
  */
 export default function parseDate (rawInput, tz = undefined) {
   if (typeof rawInput === 'boolean') return null
