@@ -25,12 +25,12 @@ export default function applyDate (time, date, timezone = undefined) {
   const dateInZone = addMilliseconds(dateInUTC, dateOffset)
 
   // Perform the actual applying of the date
-  // Note: Order is important, day -> month -> year
+  // Note: Order is important, year -> month -> day (otherwise funny things happen in leap years with Feb 28)
   // Note: Has to use the UTC variants to avoid interference of system timezone
   let outputInZone = new Date(timeInZone)
-  outputInZone.setUTCDate(dateInZone.getUTCDate())
-  outputInZone.setUTCMonth(dateInZone.getUTCMonth())
   outputInZone.setUTCFullYear(dateInZone.getUTCFullYear())
+  outputInZone.setUTCMonth(dateInZone.getUTCMonth())
+  outputInZone.setUTCDate(dateInZone.getUTCDate())
 
   // Change output from sepcified timezone back to UTC
   const inUTC = addMilliseconds(outputInZone, -getTimezoneOffset(tz, outputInZone))

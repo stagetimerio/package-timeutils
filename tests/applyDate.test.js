@@ -133,7 +133,7 @@ describe('applyDate', () => {
     expect(output).to.deep.equal(new Date('2023-10-01T14:10:00.000Z')) // Mon Oct 02 2023 01:10:00 GMT+1100 (Australian Eastern Daylight Time)
   })
 
-  test('"Until Finish Time" bug – DST offset', () => {
+  test('Bug: "Until Finish Time" – DST offset', () => {
     const tz = 'Europe/Berlin'
     const today = new Date('2024-02-03T23:00:00.000Z')
 
@@ -144,7 +144,7 @@ describe('applyDate', () => {
     expect(applyDate(new Date('2023-12-15T21:30:00.000Z'), today, tz)).to.deep.equal(new Date('2024-02-04T21:30:00.000Z'))
   })
 
-  test('"Until Finish Time" bug – wrong date', () => {
+  test('Bug: "Until Finish Time" – wrong date', () => {
     const tz = 'America/Los_Angeles'
     const today = new Date('2024-02-03T08:00:00.000Z') // Sat Feb 03 2024 00:00:00 GMT-0800 (Pacific Standard Time)
 
@@ -153,4 +153,10 @@ describe('applyDate', () => {
     expect(applyDate(new Date('2023-12-15T21:30:00.000Z'), today, tz)).to.deep.equal(new Date('2024-02-03T21:30:00.000Z'))
   })
 
+  test('Bug: February 27 -> 30 in a leap year', () => {
+    const inTime = new Date('2024-02-27T07:04:04.000Z')
+    const inDate = new Date('2023-11-30T07:02:02.000Z')
+    const output = applyDate(inTime, inDate)
+    expect(output).to.deep.equal(new Date('2023-11-30T07:04:04.000Z'))
+  })
 })
