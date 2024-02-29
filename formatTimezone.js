@@ -9,8 +9,9 @@ import abbreviations from './abbreviations.js'
  * @return {string} The formatted timezone string.
  */
 export default function formatTimezone (timezone, format = 'long', date = new Date()) {
-  const formatOpts = { timeZone: timezone }
+  if (!timezone) return ''
 
+  const formatOpts = { timeZone: timezone }
   const formatArray = Array.isArray(format) ? format : [format]
 
   for (let fmt of formatArray) {
