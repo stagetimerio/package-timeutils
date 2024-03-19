@@ -3,6 +3,13 @@ import abbreviations from './abbreviations.js'
 /**
  * Formats an IANA timezone string into a specified representation.
  *
+ * Support for timeZoneName = 'longOffset'
+ *   - Chrome 95
+ *   - Edge 95
+ *   - Firefox 91
+ *   - Safari 15.4
+ *   - Node.js 17
+ *
  * @param {string} timezone - The IANA timezone string, e.g., 'America/Los_Angeles'.
  * @param {string|string[]} format - One of 'long', 'abbr', 'offset', or an array of these values.
  * @param {Date} date - The reference date used to determine the 'long', 'abbr' and 'offset'
@@ -32,12 +39,18 @@ export default function formatTimezone (timezone, format = 'long', date = new Da
       break
 
     case 'offset':
-      formatOpts.timeZoneName = 'longOffset'
-      const offset = new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1]
+      let offset = ''
+      try {
+        formatOpts.timeZoneName = 'longOffset'
+        offset = new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1]
+      } catch (e) {
+        formatOpts.timeZoneName = 'short'
+        offset = new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1]
+      }
       return offset === 'GMT' ? 'GMT+00:00' : offset
 
     default:
-      throw new Error('Invalid format option')
+      throw new Error('Format option must be one of \'city\', \'long\', \'abbr\' or \'offset\'')
     }
   }
 
