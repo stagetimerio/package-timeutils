@@ -8,7 +8,7 @@ import addDays from 'date-fns/addDays/index.js'
  * @param {Date | string} rawInput - The timestamp to parse. Can be a Date object or a string representing a date.
  * @param {Object} options - Optional parameters to refine the parsing behavior.
  * @param {string} [options.timezone] - The timezone to consider for parsing. If not provided, the system's timezone is used.
- * @param {Date} [options.after] - Ensures the parsed date is after this date. If the parsed date is earlier, it's adjusted to the next day.
+ * @param {Date} [options.after] - Ensures the parsed date is after or at this date. If the parsed date is earlier, it's adjusted to the next day.
  * @param {Date} [options.now] - A specific date to consider as 'today', primarily used for testing. Defaults to the current date if not provided.
  * @returns {Date} - The parsed and adjusted date as per the provided options.
  *
@@ -24,7 +24,7 @@ import addDays from 'date-fns/addDays/index.js'
  */
 export default function parseDateAsToday (rawInput, {
   timezone = undefined,
-  after = undefined,
+  after = undefined, // behaves like 'greater than or equal'
   now = undefined,
 } = {}) {
   // Validate parameters
