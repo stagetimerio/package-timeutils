@@ -1,5 +1,6 @@
 import parseDate from './parseDate.js'
 import applyDate from './applyDate.js'
+import getToday from './getToday.js'
 import addDays from 'date-fns/addDays/index.js'
 
 /**
@@ -36,7 +37,7 @@ export default function parseDateAsToday (rawInput, {
   }
 
   // Parse input
-  const today = now || new Date()
+  const today = getToday(timezone, now)
   const parsedInput = parseDate(rawInput, timezone)
 
   // Consider the `after` date when applying the date
