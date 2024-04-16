@@ -1,6 +1,5 @@
 import getTimezoneOffset from 'date-fns-tz/getTimezoneOffset'
 import addMilliseconds from 'date-fns/addMilliseconds'
-import addMinutes from 'date-fns/addMinutes'
 
 /**
  * Get the Date of 0:00 today in the given timezone
@@ -13,9 +12,8 @@ export default function getToday (timezone = undefined, now = undefined) {
   if (now !== undefined && !(now instanceof Date)) {
     throw new Error('The 2nd argument must be undefined or an instance of date.')
   }
-  // Step 1: Undo system timezone for new Date() (system -> UTC)
-  const inSystem = new Date()
-  const inUTC = now || addMinutes(inSystem, -inSystem.getTimezoneOffset())
+  // Step 1: Determine now (new Date() carries no timezone info, always in UTC)
+  const inUTC = now || new Date()
 
   // Step 2: Apply target timezone (UTC -> zoned)
   const tzOffset = timezone ? getTimezoneOffset(timezone, inUTC) : 0

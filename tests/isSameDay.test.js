@@ -49,4 +49,10 @@ describe('isSameDay', () => {
     const date2 = new Date('2024-04-11T00:00:00Z')
     expect(isSameDay(date1, date2, 'UTC')).to.be.false
   })
+
+  test('AUS Date Picker bug', () => {
+    const date1 = new Date('2024-04-16T14:30:00.000Z')
+    const date2 = new Date('2024-04-16T00:00:00.000Z')
+    expect(isSameDay(date1, date2, 'UTC')).to.be.true
+  })
 })

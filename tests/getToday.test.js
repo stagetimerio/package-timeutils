@@ -26,6 +26,10 @@ describe('applyDate', () => {
     // Tue Oct 03 2023 01:30:00 GMT+0000 (UTC)
     const today2 = getToday(tz, new Date('2023-10-03T01:30:00.000Z'))
     expect(today2.toISOString()).to.equal('2023-10-03T00:00:00.000Z')
+
+    // Tue Apr 16 2024 15:01:22 GMT+0000 (UTC)
+    const today3 = getToday(tz, new Date('2024-04-16T15:01:22.871Z'))
+    expect(today3.toISOString()).to.equal('2024-04-16T00:00:00.000Z')
   })
 
   test('Europe/Berlin', () => {
