@@ -1,5 +1,5 @@
+import { addDays } from 'date-fns/addDays'
 import getToday from './getToday.js'
-import addDays from 'date-fns/addDays'
 
 /**
  * Get the Date of 0:00 tomorrow in the given timezone

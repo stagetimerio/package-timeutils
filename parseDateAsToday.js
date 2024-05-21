@@ -1,7 +1,7 @@
 import parseDate from './parseDate.js'
 import applyDate from './applyDate.js'
 import getToday from './getToday.js'
-import addDays from 'date-fns/addDays/index.js'
+import { addDays } from 'date-fns/addDays'
 
 /**
  * Parses a given timestamp and sets it as today's date, with adjustments based on provided options.

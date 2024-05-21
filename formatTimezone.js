@@ -43,7 +43,7 @@ export default function formatTimezone (timezone, format = 'long', date = new Da
       try {
         formatOpts.timeZoneName = 'longOffset'
         offset = new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1]
-      } catch (e) {
+      } catch {
         formatOpts.timeZoneName = 'short'
         offset = new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1]
       }

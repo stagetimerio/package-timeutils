@@ -1,5 +1,5 @@
-import getTimezoneOffset from 'date-fns-tz/getTimezoneOffset'
-import addMilliseconds from 'date-fns/addMilliseconds'
+import { getTimezoneOffset } from 'date-fns-tz/getTimezoneOffset'
+import { addMilliseconds } from 'date-fns/addMilliseconds'
 
 /**
  * Get the Date of 0:00 today in the given timezone

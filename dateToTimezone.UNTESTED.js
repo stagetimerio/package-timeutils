@@ -1,5 +1,5 @@
-import { getTimezoneOffset } from 'date-fns-tz'
-import { addMilliseconds } from 'date-fns'
+import { getTimezoneOffset } from 'date-fns-tz/getTimezoneOffset'
+import { addMilliseconds } from 'date-fns/addMilliseconds'
 
 const localTz = Intl?.DateTimeFormat()?.resolvedOptions()?.timeZone
 

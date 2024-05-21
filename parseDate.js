@@ -1,8 +1,8 @@
-import parse from 'date-fns/parse/index.js'
-import parseISO from 'date-fns/parseISO/index.js'
-import getTimezoneOffset from 'date-fns-tz/getTimezoneOffset'
-import addMinutes from 'date-fns/addMinutes'
-import addMilliseconds from 'date-fns/addMilliseconds'
+import { parse } from 'date-fns/parse'
+import { parseISO } from 'date-fns/parseISO'
+import { getTimezoneOffset } from 'date-fns-tz/getTimezoneOffset'
+import { addMinutes } from 'date-fns/addMinutes'
+import { addMilliseconds } from 'date-fns/addMilliseconds'
 import isValidDate from './isValidDate.js'
 
 /**
@@ -48,8 +48,10 @@ export default function parseDate (rawInput, tz = undefined) {
   const parsedNative = new Date(rawInput)
   if (isValidDate(parsedNative)) return parsedNative
 
-  const parsedISO = parseISO(rawInput)
-  if (isValidDate(parsedISO)) return parsedISO
+  if (typeof rawInput === 'string') {
+    const parsedISO = parseISO(rawInput)
+    if (isValidDate(parsedISO)) return parsedISO
+  }
 
   return null
 }
