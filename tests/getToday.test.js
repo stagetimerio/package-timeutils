@@ -66,6 +66,9 @@ describe('applyDate', () => {
     // Tue Oct 03 2023 01:30:00 GMT+1100 (Australian Eastern Daylight Time)
     const today2 = getToday(tz, new Date('2023-10-02T14:30:00.000Z'))
     expect(today2.toISOString()).to.equal('2023-10-02T13:00:00.000Z')
-  })
 
+    // Sun May 12 2024 08:00:00 GMT+1000 (Australian Eastern Standard Time)
+    const today3 = getToday(tz, new Date('2024-05-11T22:00:00.000Z'))
+    expect(today3.toISOString()).to.equal('2024-05-11T14:00:00.000Z')
+  })
 })
