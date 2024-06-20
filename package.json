@@ -17,6 +17,7 @@
     "type": "git",
     "url": "git+https://github.com/stagetimerio/package-timeutils.git"
   },
+  "exports": "./index.js",
   "license": "ISC",
   "dependencies": {
     "date-fns": "^3.6.0",

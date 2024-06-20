@@ -1,15 +1,15 @@
 # This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
 
-name: Node.js CI Tests
+name: Unit Tests
 
 on:
   push:
-    tags-ignore:
+    branches:
       - '**'
   pull_request:
     branches:
-      - 'main'
+      - '**'
 
 jobs:
   test:
@@ -22,11 +22,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Node 18
+      - name: Node 20
         uses: actions/setup-node@v4
         with:
-          node-version: 18
-          cache: 'npm'
+          node-version: 20
 
       - name: Install Dependencies
         run: npm install
