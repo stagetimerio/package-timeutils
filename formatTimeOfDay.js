@@ -6,7 +6,7 @@ import { formatInTimeZone } from 'date-fns-tz'
  *
  * @param  {Date}    date - The date object to format
  * @param  {string}  [options.timezone = 'UTC'] - The IANA timezone name, e.g., 'America/New_York'
- * @param  {string}  [options.format = '24h'] - The time format, either '12h' or '24h'
+ * @param  {string}  [options.format = '24h'] - The time format, either '12h', '12h_a' or '24h'
  * @param  {string}  [options.seconds = 'always'] - When to display seconds: 'always', 'nonzero', or 'never'
  * @param  {boolean} [options.leadingZero = false] - Whether to display leading zero in hours
  * @return {string} - The formatted time string
@@ -23,8 +23,9 @@ export function formatTimeOfDay (
   if (!(date instanceof Date)) throw new Error('`date` must be an instance of Date')
 
   const formatOptions = {
-    '12h': leadingZero ? 'hh:mm a' : 'h:mm a',
     '24h': leadingZero ? 'HH:mm' : 'H:mm',
+    '12h': leadingZero ? 'hh:mm' : 'h:mm',
+    '12h_a': leadingZero ? 'hh:mm a' : 'h:mm a',
   }
 
   let timeFormat = formatOptions[format]
