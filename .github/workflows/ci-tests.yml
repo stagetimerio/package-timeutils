@@ -20,10 +20,10 @@ jobs:
         timezone: [UTC, America/Los_Angeles, Europe/Berlin, Australia/Sydney]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Node 18
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'npm'
