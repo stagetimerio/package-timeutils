@@ -26,7 +26,7 @@ const thousands = num => Math.floor((num / 1000) % 10)
  * @param  {string} options.overtimePrefix
  * @return {string[]} – The individual digits of the countdown clock
  */
-export default function dhmsToDigits (
+export function dhmsToDigits (
   dhms,
   {
     format = countdownFormats.DEFAULT,
