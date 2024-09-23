@@ -7,6 +7,8 @@ on:
   push:
     branches:
       - '**'
+    tags-ignore:
+      - '**'
   pull_request:
     branches:
       - '**'
@@ -26,6 +28,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Write .npmrc file
+        run: |
+          echo //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} > $HOME/.npmrc
+          echo @rundown-studio:registry=https://npm.pkg.github.com >> $HOME/.npmrc
 
       - name: Install Dependencies
         run: npm install

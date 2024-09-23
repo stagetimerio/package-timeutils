@@ -14,4 +14,11 @@ export default [
       'indent': ['warn', 2],
     },
   },
+
+  // Global ignore patterns
+  {
+    ignores: [
+      'dist/',
+    ],
+  },
 ]

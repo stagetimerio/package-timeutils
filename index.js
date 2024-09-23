@@ -1,3 +1,9 @@
+/*!
+ * @stagetimerio/timeutils
+ * © Lukas Hermann <hey@lukashermann.dev>
+ * All rights reserved.
+ */
+
 export { default as millisecondsToHms } from './millisecondsToHms.js'
 export { default as millisecondsToDhms } from './millisecondsToDhms.js'
 export { default as hmsToMilliseconds } from './hmsToMilliseconds.js'

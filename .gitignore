@@ -2,6 +2,7 @@
 node_modules
 dist
 .docker
+tests/tmp.js
 
 # local env files
 .env.local
