@@ -131,4 +131,13 @@ describe('parseDateAsToday', () => {
     const output = parseDateAsToday(input, { timezone, after: new Date(after), now: new Date(now) })
     expect(output).to.deep.equal(new Date('2024-10-08T18:30:00.000Z')) // Wed Oct 09 2024 05:30:00 GMT+1100 (Australian Eastern Daylight Time)
   })
+
+  test('Bug: Wrong day on date of DST change 2025-03-30', () => {
+    const timezone = 'Europe/Berlin'
+    const input = '2025-03-30T20:20:00.000Z' // Sun Mar 30 2025 22:18:00 GMT+0200 (Central European Summer Time)
+    const now = '2025-03-30T17:43:50.000Z' // Sun Mar 30 2025 19:43:50 GMT+0200 (Central European Summer Time)
+    const after = undefined
+    const output = parseDateAsToday(input, { timezone, after, now: new Date(now) })
+    expect(output).to.deep.equal(new Date('2025-03-30T20:20:00.000Z')) // Sun Mar 30 2025 22:20:00 GMT+0200 (Central European Summer Time)
+  })
 })

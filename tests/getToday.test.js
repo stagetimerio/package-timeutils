@@ -71,4 +71,19 @@ describe('applyDate', () => {
     const today3 = getToday(tz, new Date('2024-05-11T22:00:00.000Z'))
     expect(today3.toISOString()).to.equal('2024-05-11T14:00:00.000Z')
   })
+  test('Bug: Wrong date on DST day because change is at 3AM, 2025-03-30', () => {
+    const tz = 'Europe/Berlin'
+
+    // The day before DST
+    const today1 = getToday(tz, new Date('2025-03-29T17:43:50.000Z')) // Sat Mar 29 2025 18:43:50 GMT+0100 (Central European Standard Time)
+    expect(today1.toISOString()).to.equal('2025-03-28T23:00:00.000Z') // Sat Mar 29 2025 00:00:00 GMT+0100 (Central European Standard Time)
+
+    // The day of DST (DST change is 3am)
+    const today2 = getToday(tz, new Date('2025-03-30T17:43:50.000Z')) // Sun Mar 30 2025 19:43:50 GMT+0200 (Central European Summer Time)
+    expect(today2.toISOString()).to.equal('2025-03-29T23:00:00.000Z') // Sun Mar 30 2025 00:00:00 GMT+0100 (Central European Standard Time)
+
+    // The day after DST
+    const today3 = getToday(tz, new Date('2025-03-31T17:43:50.000Z')) // Mon Mar 31 2025 19:43:50 GMT+0200 (Central European Summer Time)
+    expect(today3.toISOString()).to.equal('2025-03-30T22:00:00.000Z') // Mon Mar 31 2025 00:00:00 GMT+0200 (Central European Summer Time)
+  })
 })
