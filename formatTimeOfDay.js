@@ -1,5 +1,6 @@
-import { getSeconds } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
+import { getSeconds, format as fnsFormat } from 'date-fns'
+import { tz } from '@date-fns/tz'
+// import { formatInTimeZone } from 'date-fns-tz'
 
 /**
  * Format the time of day with timezone and format
@@ -35,5 +36,5 @@ export function formatTimeOfDay (
     timeFormat = timeFormat.replace(':mm', ':mm:ss')
   }
 
-  return formatInTimeZone(date, timezone, timeFormat)
+  return fnsFormat(date, timeFormat, { in: tz(timezone) })
 }

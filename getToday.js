@@ -1,4 +1,5 @@
-import { getTimezoneOffset } from 'date-fns-tz/getTimezoneOffset'
+import { getTimezoneOffset } from './getTimezoneOffset.js'
+import { isValidTimezone } from './isValidTimezone.js'
 import { addMilliseconds } from 'date-fns/addMilliseconds'
 
 /**
@@ -12,20 +13,18 @@ export default function getToday (timezone = undefined, now = undefined) {
   if (now !== undefined && !(now instanceof Date)) {
     throw new Error('The 2nd argument must be undefined or an instance of date.')
   }
-  // Step 1: Determine now (new Date() carries no timezone info, always in UTC)
+
+  // Validate timezone - default to UTC if invalid or undefined
+  const tz = timezone && isValidTimezone(timezone) ? timezone : 'UTC'
+
+  // Determine now (new Date() carries no timezone info, always in UTC)
   const inUTC = now || new Date()
 
-  // Step 2: Apply target timezone (UTC -> zoned)
-  const tzOffset = timezone ? getTimezoneOffset(timezone, inUTC) : 0
-  const inZone = addMilliseconds(inUTC, tzOffset)
+  // Apply target timezone (UTC -> zoned)
+  const inputOffset = tz ? getTimezoneOffset(tz, inUTC) : 0
+  const inZone = addMilliseconds(inUTC, inputOffset)
 
-  // console.log(
-  //   '[getToday.js]',
-  //   { timezone },
-  //   { inSystem, inUTC, inZone },
-  // )
-
-  // Step 3: Move time to 0:00:00
+  // Move time to 0:00:00
   inZone.setUTCHours(0, 0, 0, 0)
 
   // Step 4: Revert to UTC (zoned -> UTC)

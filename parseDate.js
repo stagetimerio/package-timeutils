@@ -1,6 +1,6 @@
 import { parse } from 'date-fns/parse'
 import { parseISO } from 'date-fns/parseISO'
-import { getTimezoneOffset } from 'date-fns-tz/getTimezoneOffset'
+import { getTimezoneOffset } from './getTimezoneOffset.js'
 import { addMinutes } from 'date-fns/addMinutes'
 import { addMilliseconds } from 'date-fns/addMilliseconds'
 import isValidDate from './isValidDate.js'

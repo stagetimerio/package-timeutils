@@ -1,7 +1,7 @@
 import isValidDate from './isValidDate.js'
 import parseDate from './parseDate.js'
 import { addMilliseconds } from 'date-fns/addMilliseconds'
-import { getTimezoneOffset } from 'date-fns-tz/getTimezoneOffset'
+import { getTimezoneOffset } from './getTimezoneOffset.js'
 
 /**
  * Apply year-month-day to a JS date.

@@ -1,4 +1,5 @@
-import { formatInTimeZone } from 'date-fns-tz'
+import { isSameDay as fnsIsSameDay } from 'date-fns'
+import { tz } from '@date-fns/tz'
 
 const localTz = Intl?.DateTimeFormat()?.resolvedOptions()?.timeZone
 
@@ -11,8 +12,5 @@ const localTz = Intl?.DateTimeFormat()?.resolvedOptions()?.timeZone
  * @returns {boolean} - True if both dates are on the same day in the specified timezone; false otherwise
  */
 export default function isSameDay (date1, date2, timezone = localTz) {
-  const dateString1 = formatInTimeZone(date1, timezone, 'yyyy-MM-dd')
-  const dateString2 = formatInTimeZone(date2, timezone, 'yyyy-MM-dd')
-
-  return dateString1 === dateString2
+  return fnsIsSameDay(date1, date2, { in: tz(timezone) })
 }
