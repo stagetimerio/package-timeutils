@@ -159,4 +159,12 @@ describe('applyDate', () => {
     const output = applyDate(inTime, inDate)
     expect(output).to.deep.equal(new Date('2023-11-30T07:04:04.000Z'))
   })
+
+  test('Bug: DST change at 3AM on 2025-03-30, use the correct offsets', () => {
+    const tz = 'Europe/Berlin'
+    const inTime = new Date('2025-03-30T00:00:00.000Z')
+    const inDate = new Date('2025-03-30T19:02:28.858Z')
+    const output = applyDate(inTime, inDate, tz)
+    expect(output).to.deep.equal(new Date('2025-03-30T00:00:00.000Z'))
+  })
 })

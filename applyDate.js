@@ -33,7 +33,8 @@ export default function applyDate (time, date, timezone = undefined) {
   outputInZone.setUTCDate(dateInZone.getUTCDate())
 
   // Change output from sepcified timezone back to UTC
-  const inUTC = addMilliseconds(outputInZone, -getTimezoneOffset(tz, outputInZone))
+  const outputOffset = getTimezoneOffset(tz, addMilliseconds(outputInZone, -dateOffset))
+  const inUTC = addMilliseconds(outputInZone, -outputOffset)
 
   // console.log(
   //   '[applyDate.js]',
