@@ -1,5 +1,5 @@
 import parseDateAsToday from './parseDateAsToday.js'
-import applyDate from './applyDate.js'
+import { applyDate } from './applyDate.js'
 
 //
 // DEPRECATED: Moved to stagetimer/server/utils/timeUtils.js

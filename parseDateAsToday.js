@@ -1,5 +1,5 @@
 import parseDate from './parseDate.js'
-import applyDate from './applyDate.js'
+import { applyDate } from './applyDate.js'
 import getToday from './getToday.js'
 import { addDays } from 'date-fns/addDays'
 

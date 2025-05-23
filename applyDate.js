@@ -11,7 +11,7 @@ import { getTimezoneOffset } from './getTimezoneOffset.js'
  * @param  {string} [timezone] - an optional IANA timezone like 'Europe/Berlin'
  * @return {Date}
  */
-export default function applyDate (time, date, timezone = undefined) {
+export function applyDate (time, date, timezone = undefined) {
   const timeInUTC = parseDate(time)
   const dateInUTC = parseDate(date)
   const tz = timezone || 'UTC'
