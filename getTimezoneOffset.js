@@ -29,9 +29,12 @@ export function getTimezoneOffset (timezone, date) {
     const offset = ((hours * 60 + minutes) * 60 * 1000)
 
     return offset
-  } catch {
-    // Fallback using @date-fns/tz for older browsers
-    // tzOffset returns minutes, so convert to milliseconds
-    return tzOffset(timezone, date) * 60 * 1000
+  } catch (error) {
+    if (error instanceof RangeError && error.message.includes('longOffset')) {
+      // Fallback using @date-fns/tz for older browsers
+      // tzOffset returns minutes, so convert to milliseconds
+      return tzOffset(timezone, date) * 60 * 1000
+    }
+    throw error
   }
 }
