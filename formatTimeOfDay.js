@@ -36,5 +36,9 @@ export function formatTimeOfDay (
     timeFormat = timeFormat.replace(':mm', ':mm:ss')
   }
 
-  return fnsFormat(date, timeFormat, { in: tz(timezone) })
+  try {
+    return fnsFormat(date, timeFormat, { in: tz(timezone) })
+  } catch (_e) {
+    return '--:--'
+  }
 }
