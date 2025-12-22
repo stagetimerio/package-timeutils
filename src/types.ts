@@ -6,7 +6,7 @@ export interface HMS {
 }
 
 export interface DHMS extends HMS {
-  negative: number
+  negative: number // Rename to overtime
   days: number
 }
 
