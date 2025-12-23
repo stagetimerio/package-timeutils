@@ -9,20 +9,25 @@ interface Timer {
   finishDate?: Date | string
 }
 
+function toUTCDateString(date: Date | string): Date | string {
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return `${date}T00:00:00.000Z`
+  }
+  return date
+}
+
 export default function timerToFinishDate(timer: Timer | null | undefined): Date | null {
   console.info('DEPRECATED @stagetimerio/timeutils/timerToFinishDate')
   if (!timer) return null
   const start = timerToStartDate(timer)
   let finish: Date | null = null
   if (start) {
-    // Original code passed { reference: start, tollerance: 0 } which were ignored
-    // by parseDateAsToday, so this effectively just called parseDateAsToday(finishTime)
-    finish = parseDateAsToday(timer.finishTime as Date | string)
+    finish = parseDateAsToday(timer.finishTime as Date | string, { after: start, now: start })
   } else {
     finish = parseDateAsToday(timer.finishTime as Date | string)
   }
   if (timer.finishDate) {
-    finish = applyDate(finish, timer.finishDate)
+    finish = applyDate(finish, toUTCDateString(timer.finishDate))
   }
   return finish
 }

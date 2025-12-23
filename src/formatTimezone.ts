@@ -42,7 +42,8 @@ export default function formatTimezone(
         formatOpts.timeZoneName = 'long'
         const long = new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1]
         if (!long) break
-        const abbr = abbreviations[long] || abbreviations[long.replace('Standard ', '')]
+        const abbrMap = abbreviations as Record<string, string>
+        const abbr = abbrMap[long] || abbrMap[long.replace('Standard ', '')]
         if (abbr) return abbr
         break
       }
