@@ -87,6 +87,11 @@ jobs:
           registry-url: https://npm.pkg.github.com/
           scope: '@stagetimerio'
 
+      - name: Install Dependencies
+        run: npm ci --loglevel=error
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Publish Package
         run: npm publish
         env:
