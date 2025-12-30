@@ -175,4 +175,33 @@ describe('applyDate', () => {
     const output = applyDate(inTime, inDate, tz)
     expect(output).to.deep.equal(new Date('2025-03-30T00:00:00.000Z'))
   })
+
+  test('Bug: Month overflow - Dec 30 to Feb should not become March', () => {
+    // This bug occurred when source day (30) doesn't exist in target month (Feb)
+    const inTime = new Date('2025-12-30T10:15:00.000Z') // Dec 30
+    const inDate = new Date('2020-02-02T00:00:00.000Z') // Feb 2
+    const output = applyDate(inTime, inDate)
+    expect(output).to.deep.equal(new Date('2020-02-02T10:15:00.000Z'))
+  })
+
+  test('Bug: Month overflow - Dec 31 to Feb should not become March', () => {
+    const inTime = new Date('2025-12-31T10:15:00.000Z') // Dec 31
+    const inDate = new Date('2020-02-15T00:00:00.000Z') // Feb 15
+    const output = applyDate(inTime, inDate)
+    expect(output).to.deep.equal(new Date('2020-02-15T10:15:00.000Z'))
+  })
+
+  test('Bug: Month overflow - Jan 31 to Apr (30 days) should not overflow', () => {
+    const inTime = new Date('2025-01-31T10:15:00.000Z') // Jan 31
+    const inDate = new Date('2020-04-15T00:00:00.000Z') // Apr 15
+    const output = applyDate(inTime, inDate)
+    expect(output).to.deep.equal(new Date('2020-04-15T10:15:00.000Z'))
+  })
+
+  test('Bug: Month overflow - Mar 31 to Feb in leap year', () => {
+    const inTime = new Date('2025-03-31T10:15:00.000Z') // Mar 31
+    const inDate = new Date('2020-02-29T00:00:00.000Z') // Feb 29 (leap year)
+    const output = applyDate(inTime, inDate)
+    expect(output).to.deep.equal(new Date('2020-02-29T10:15:00.000Z'))
+  })
 })
