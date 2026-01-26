@@ -1,214 +1,223 @@
 import { expect } from 'chai'
-import { formatTimeOfDay } from '../src/index'
+import { formatTimeOfDay, formatStrHasSeconds } from '../src/index'
+
+// Test date: 2023-06-17T15:10:30Z (3:10:30 PM UTC)
+const DATE_WITH_SECONDS = new Date('2023-06-17T15:10:30Z')
+// Test date: 2023-06-17T15:10:00Z (3:10:00 PM UTC)
+const DATE_NO_SECONDS = new Date('2023-06-17T15:10:00Z')
+// Test date for leading zero: 2023-06-17T05:10:30Z (5:10:30 AM UTC)
+const DATE_SINGLE_DIGIT_HOUR = new Date('2023-06-17T05:10:30Z')
+
+describe('formatStrHasSeconds', () => {
+  it('should return true for formats with :ss', () => {
+    expect(formatStrHasSeconds('H:mm:ss')).to.equal(true)
+    expect(formatStrHasSeconds('h:mm:ss aa')).to.equal(true)
+    expect(formatStrHasSeconds('h:mm:ss')).to.equal(true)
+  })
+
+  it('should return false for formats without :ss', () => {
+    expect(formatStrHasSeconds('H:mm')).to.equal(false)
+    expect(formatStrHasSeconds('h:mm aa')).to.equal(false)
+    expect(formatStrHasSeconds('h:mm')).to.equal(false)
+  })
+})
 
 describe('formatTimeOfDay', () => {
-  it('should format time in 24h format with seconds always shown', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '24h', seconds: 'always' })
-    expect(formatted).to.equal('15:10:30')
-  })
+  // ── Concrete formatStr values ──────────────────────────────────
 
-  it('should format time in 24h format with nonzero seconds shown', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '24h', seconds: 'nonzero' })
-    expect(formatted).to.equal('15:10:30')
-  })
-
-  it('should format time in 24h format with zero seconds hidden', () => {
-    const date = new Date('2023-06-17T15:10:00Z')
-    const formatted = formatTimeOfDay(date, { format: '24h', seconds: 'nonzero' })
-    expect(formatted).to.equal('15:10')
-  })
-
-  it('should format time in 12h format with seconds always shown', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '12h', seconds: 'always' })
-    expect(formatted).to.equal('3:10:30')
-  })
-
-  it('should format time in 12h format with nonzero seconds shown', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '12h', seconds: 'nonzero' })
-    expect(formatted).to.equal('3:10:30')
-  })
-
-  it('should format time in 12h format with zero seconds hidden', () => {
-    const date = new Date('2023-06-17T15:10:00Z')
-    const formatted = formatTimeOfDay(date, { format: '12h', seconds: 'nonzero' })
-    expect(formatted).to.equal('3:10')
-  })
-
-  it('should format time in 12h_a format with seconds always shown', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '12h_a', seconds: 'always' })
-    expect(formatted).to.equal('3:10:30 PM')
-  })
-
-  it('should format time in 12h_a format with nonzero seconds shown', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '12h_a', seconds: 'nonzero' })
-    expect(formatted).to.equal('3:10:30 PM')
-  })
-
-  it('should format time in 12h_a format with zero seconds hidden', () => {
-    const date = new Date('2023-06-17T15:10:00Z')
-    const formatted = formatTimeOfDay(date, { format: '12h_a', seconds: 'nonzero' })
-    expect(formatted).to.equal('3:10 PM')
-  })
-
-  it('should format time in 24h format in Europe/Berlin timezone', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, {
-      format: '24h',
-      seconds: 'always',
-      timezone: 'Europe/Berlin',
+  describe('H:mm:ss (24h with seconds)', () => {
+    it('should format correctly', () => {
+      expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'H:mm:ss' })).to.equal('15:10:30')
     })
-    expect(formatted).to.equal('17:10:30')
-  })
 
-  it('should format time in 12h format in Europe/Berlin timezone', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, {
-      format: '12h',
-      seconds: 'always',
-      timezone: 'Europe/Berlin',
+    it('should show zero seconds', () => {
+      expect(formatTimeOfDay(DATE_NO_SECONDS, { formatStr: 'H:mm:ss' })).to.equal('15:10:00')
     })
-    expect(formatted).to.equal('5:10:30')
   })
 
-  it('should format time in 12h_a format in Europe/Berlin timezone', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, {
-      format: '12h_a',
-      seconds: 'always',
-      timezone: 'Europe/Berlin',
+  describe('H:mm (24h without seconds)', () => {
+    it('should format correctly', () => {
+      expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'H:mm' })).to.equal('15:10')
     })
-    expect(formatted).to.equal('5:10:30 PM')
   })
 
-  it('should format time in 24h format in Australia/Sydney timezone', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, {
-      format: '24h',
-      seconds: 'always',
-      timezone: 'Australia/Sydney',
+  describe('h:mm:ss aa (12h with seconds and AM/PM)', () => {
+    it('should format PM correctly', () => {
+      expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss aa' })).to.equal('3:10:30 PM')
     })
-    expect(formatted).to.equal('1:10:30')
-  })
 
-  it('should format time in 12h format in Australia/Sydney timezone', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, {
-      format: '12h',
-      seconds: 'always',
-      timezone: 'Australia/Sydney',
+    it('should format AM correctly', () => {
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { formatStr: 'h:mm:ss aa' })).to.equal('5:10:30 AM')
     })
-    expect(formatted).to.equal('1:10:30')
   })
 
-  it('should format time in 12h_a format in Australia/Sydney timezone', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, {
-      format: '12h_a',
-      seconds: 'always',
-      timezone: 'Australia/Sydney',
+  describe('h:mm aa (12h without seconds, with AM/PM)', () => {
+    it('should format correctly', () => {
+      expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm aa' })).to.equal('3:10 PM')
     })
-    expect(formatted).to.equal('1:10:30 AM')
   })
 
-  it('should format time in 24h format in America/Los_Angeles timezone', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, {
-      format: '24h',
-      seconds: 'always',
-      timezone: 'America/Los_Angeles',
+  describe('h:mm:ss (12h with seconds, no AM/PM)', () => {
+    it('should format correctly', () => {
+      expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss' })).to.equal('3:10:30')
     })
-    expect(formatted).to.equal('8:10:30')
   })
 
-  it('should format time in 12h format in America/Los_Angeles timezone', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, {
-      format: '12h',
-      seconds: 'always',
-      timezone: 'America/Los_Angeles',
+  describe('h:mm (12h without seconds, no AM/PM)', () => {
+    it('should format correctly', () => {
+      expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm' })).to.equal('3:10')
     })
-    expect(formatted).to.equal('8:10:30')
   })
 
-  it('should format time in 12h_a format in America/Los_Angeles timezone', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, {
-      format: '12h_a',
-      seconds: 'always',
-      timezone: 'America/Los_Angeles',
+  // ── Default (no options) ───────────────────────────────────────
+
+  describe('default (no options)', () => {
+    it('should use H:mm:ss in UTC', () => {
+      expect(formatTimeOfDay(DATE_WITH_SECONDS)).to.equal('15:10:30')
     })
-    expect(formatted).to.equal('8:10:30 AM')
+
+    it('should show zero seconds', () => {
+      expect(formatTimeOfDay(DATE_NO_SECONDS)).to.equal('15:10:00')
+    })
   })
 
-  it('should format time in 24h format without seconds', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '24h', seconds: 'never' })
-    expect(formatted).to.equal('15:10')
+  // ── seconds override ──────────────────────────────────────────
+
+  describe('seconds override', () => {
+    describe('seconds: "never"', () => {
+      it('should strip seconds from H:mm:ss', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'H:mm:ss', seconds: 'never' })).to.equal('15:10')
+      })
+
+      it('should strip seconds from h:mm:ss aa', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss aa', seconds: 'never' })).to.equal('3:10 PM')
+      })
+
+      it('should strip seconds from h:mm:ss', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss', seconds: 'never' })).to.equal('3:10')
+      })
+
+      it('should not affect H:mm (already no seconds)', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'H:mm', seconds: 'never' })).to.equal('15:10')
+      })
+
+      it('should not affect h:mm aa (already no seconds)', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm aa', seconds: 'never' })).to.equal('3:10 PM')
+      })
+    })
+
+    describe('seconds: "nonzero"', () => {
+      it('should show seconds when nonzero (H:mm:ss)', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'H:mm:ss', seconds: 'nonzero' })).to.equal('15:10:30')
+      })
+
+      it('should hide seconds when zero (H:mm:ss)', () => {
+        expect(formatTimeOfDay(DATE_NO_SECONDS, { formatStr: 'H:mm:ss', seconds: 'nonzero' })).to.equal('15:10')
+      })
+
+      it('should show seconds when nonzero (h:mm:ss aa)', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss aa', seconds: 'nonzero' })).to.equal('3:10:30 PM')
+      })
+
+      it('should hide seconds when zero (h:mm:ss aa)', () => {
+        expect(formatTimeOfDay(DATE_NO_SECONDS, { formatStr: 'h:mm:ss aa', seconds: 'nonzero' })).to.equal('3:10 PM')
+      })
+
+      it('should not add seconds to H:mm (most restrictive wins)', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'H:mm', seconds: 'nonzero' })).to.equal('15:10')
+      })
+
+      it('should not add seconds to h:mm aa (most restrictive wins)', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm aa', seconds: 'nonzero' })).to.equal('3:10 PM')
+      })
+    })
   })
 
-  it('should format time in 12h format without seconds', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '12h', seconds: 'never' })
-    expect(formatted).to.equal('3:10')
+  // ── leadingZero ────────────────────────────────────────────────
+
+  describe('leadingZero', () => {
+    it('should add leading zero to 24h format', () => {
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { formatStr: 'H:mm:ss', leadingZero: true })).to.equal('05:10:30')
+    })
+
+    it('should not add leading zero to 24h format by default', () => {
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { formatStr: 'H:mm:ss' })).to.equal('5:10:30')
+    })
+
+    it('should add leading zero to 12h format', () => {
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { formatStr: 'h:mm:ss', leadingZero: true })).to.equal('05:10:30')
+    })
+
+    it('should add leading zero to 12h AM/PM format', () => {
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { formatStr: 'h:mm:ss aa', leadingZero: true })).to.equal('05:10:30 AM')
+    })
+
+    it('should add leading zero to H:mm format', () => {
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { formatStr: 'H:mm', leadingZero: true })).to.equal('05:10')
+    })
+
+    it('should add leading zero to h:mm aa format', () => {
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { formatStr: 'h:mm aa', leadingZero: true })).to.equal('05:10 AM')
+    })
   })
 
-  it('should format time in 12h_a format without seconds', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '12h_a', seconds: 'never' })
-    expect(formatted).to.equal('3:10 PM')
+  // ── Timezone support ───────────────────────────────────────────
+
+  describe('timezone support', () => {
+    describe('Europe/Berlin (UTC+2 in summer)', () => {
+      it('should format 24h correctly', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'H:mm:ss', timezone: 'Europe/Berlin' })).to.equal('17:10:30')
+      })
+
+      it('should format 12h correctly', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss', timezone: 'Europe/Berlin' })).to.equal('5:10:30')
+      })
+
+      it('should format 12h AM/PM correctly', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss aa', timezone: 'Europe/Berlin' })).to.equal('5:10:30 PM')
+      })
+    })
+
+    describe('Australia/Sydney (UTC+10 in winter)', () => {
+      it('should format 24h correctly', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'H:mm:ss', timezone: 'Australia/Sydney' })).to.equal('1:10:30')
+      })
+
+      it('should format 12h correctly', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss', timezone: 'Australia/Sydney' })).to.equal('1:10:30')
+      })
+
+      it('should format 12h AM/PM correctly', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss aa', timezone: 'Australia/Sydney' })).to.equal('1:10:30 AM')
+      })
+    })
+
+    describe('America/Los_Angeles (UTC-7 in summer)', () => {
+      it('should format 24h correctly', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'H:mm:ss', timezone: 'America/Los_Angeles' })).to.equal('8:10:30')
+      })
+
+      it('should format 12h correctly', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss', timezone: 'America/Los_Angeles' })).to.equal('8:10:30')
+      })
+
+      it('should format 12h AM/PM correctly', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { formatStr: 'h:mm:ss aa', timezone: 'America/Los_Angeles' })).to.equal('8:10:30 AM')
+      })
+    })
   })
 
-  it('should format time in default 24h format with seconds when no options are passed', () => {
-    const date = new Date('2023-06-17T15:10:30Z')
-    const formatted = formatTimeOfDay(date)
-    expect(formatted).to.equal('15:10:30')
-  })
+  // ── Error handling ─────────────────────────────────────────────
 
-  it('should format time in default 24h format with seconds when no options are passed and seconds are 00', () => {
-    const date = new Date('2023-06-17T15:10:00Z')
-    const formatted = formatTimeOfDay(date)
-    expect(formatted).to.equal('15:10:00')
-  })
+  describe('error handling', () => {
+    it('should return --:-- for non-Date input', () => {
+      expect(formatTimeOfDay('not a date' as any)).to.equal('--:--')
+      expect(formatTimeOfDay(null as any)).to.equal('--:--')
+      expect(formatTimeOfDay(undefined as any)).to.equal('--:--')
+    })
 
-  it('should format time in default 24h format with leading zero and seconds always shown', () => {
-    const date = new Date('2023-06-17T05:10:30Z')
-    const formatted = formatTimeOfDay(date, { leadingZero: true })
-    expect(formatted).to.equal('05:10:30')
-  })
-
-  it('should format time in default 24h format without leading zero and seconds always shown', () => {
-    const date = new Date('2023-06-17T05:10:30Z')
-    const formatted = formatTimeOfDay(date, { leadingZero: false })
-    expect(formatted).to.equal('5:10:30')
-  })
-
-  it('should format time in 12h format with leading zero', () => {
-    const date = new Date('2023-06-17T05:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '12h', leadingZero: true })
-    expect(formatted).to.equal('05:10:30')
-  })
-
-  it('should format time in 12h format without leading zero', () => {
-    const date = new Date('2023-06-17T05:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '12h', leadingZero: false })
-    expect(formatted).to.equal('5:10:30')
-  })
-
-  it('should format time in 12h_a format with leading zero', () => {
-    const date = new Date('2023-06-17T05:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '12h_a', leadingZero: true })
-    expect(formatted).to.equal('05:10:30 AM')
-  })
-
-  it('should format time in 12h_a format without leading zero', () => {
-    const date = new Date('2023-06-17T05:10:30Z')
-    const formatted = formatTimeOfDay(date, { format: '12h_a', leadingZero: false })
-    expect(formatted).to.equal('5:10:30 AM')
+    it('should return --:-- for invalid timezone', () => {
+      expect(formatTimeOfDay(DATE_WITH_SECONDS, { timezone: 'Invalid/Timezone' })).to.equal('--:--')
+    })
   })
 })

@@ -1,48 +1,59 @@
 import { getSeconds, format as fnsFormat } from 'date-fns'
 import { tz } from '@date-fns/tz'
-import type { TimeFormat, SecondsDisplay } from './types'
+import type { SecondsDisplay } from './types'
 
 /**
- * Format the time of day with timezone and format
+ * Check whether a format string includes seconds (`:ss`)
+ */
+export function formatStrHasSeconds (formatStr: string): boolean {
+  return formatStr.includes(':ss')
+}
+
+/**
+ * Format the time of day with timezone support
  *
  * @param  {Date}    date - The date object to format
  * @param  {string}  [options.timezone = 'UTC'] - The IANA timezone name, e.g., 'America/New_York'
- * @param  {string}  [options.format = '24h'] - The time format, either '12h', '12h_a' or '24h'
- * @param  {string}  [options.seconds = 'always'] - When to display seconds: 'always', 'nonzero', or 'never'
+ * @param  {string}  [options.formatStr = 'H:mm:ss'] - A date-fns format string (e.g., 'H:mm:ss', 'h:mm aa')
+ * @param  {string}  [options.seconds] - Override: 'nonzero' | 'never' (most restrictive wins)
  * @param  {boolean} [options.leadingZero = false] - Whether to display leading zero in hours
  * @return {string} - The formatted time string
  */
-export function formatTimeOfDay(
+export function formatTimeOfDay (
   date: Date,
   {
     timezone = 'UTC',
-    format = '24h',
-    seconds = 'always',
+    formatStr = 'H:mm:ss',
+    seconds,
     leadingZero = false,
   }: {
     timezone?: string
-    format?: TimeFormat
+    formatStr?: string
     seconds?: SecondsDisplay
     leadingZero?: boolean
   } = {}
 ): string {
-  if (!(date instanceof Date)) throw new Error('`date` must be an instance of Date')
+  if (!(date instanceof Date)) return '--:--'
 
-  const formatOptions: Record<TimeFormat, string> = {
-    '24h': leadingZero ? 'HH:mm' : 'H:mm',
-    '12h': leadingZero ? 'hh:mm' : 'h:mm',
-    '12h_a': leadingZero ? 'hh:mm a' : 'h:mm a',
+  let fmt = formatStr
+
+  // 1. Apply seconds override (most restrictive wins)
+  if (formatStrHasSeconds(fmt)) {
+    if (seconds === 'never' || (seconds === 'nonzero' && getSeconds(date) === 0)) {
+      fmt = fmt.replace(':ss', '')
+    }
   }
+  // If format lacks seconds and seconds override wants them, we don't add — most restrictive wins
 
-  let timeFormat = formatOptions[format]
-
-  // Append seconds to the format string based on the seconds option
-  if (seconds === 'always' || (seconds === 'nonzero' && getSeconds(date) !== 0)) {
-    timeFormat = timeFormat.replace(':mm', ':mm:ss')
+  // 2. Apply leadingZero
+  if (leadingZero) {
+    // Replace single-char hour tokens with double-char: H → HH, h → hh
+    // Only replace standalone H/h (not already HH/hh)
+    fmt = fmt.replace(/\bH\b/g, 'HH').replace(/\bh\b/g, 'hh')
   }
 
   try {
-    return fnsFormat(date, timeFormat, { in: tz(timezone) })
+    return fnsFormat(date, fmt, { in: tz(timezone) })
   } catch {
     return '--:--'
   }

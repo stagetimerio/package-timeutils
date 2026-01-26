@@ -10,8 +10,7 @@ export interface DHMS extends HMS {
   days: number
 }
 
-export type TimeFormat = '12h' | '12h_a' | '24h'
-export type SecondsDisplay = 'always' | 'nonzero' | 'never'
+export type SecondsDisplay = 'nonzero' | 'never'
 
 export type CountdownFormatCode =
   | 'DHHMMSS'

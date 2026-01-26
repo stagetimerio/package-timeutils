@@ -23,4 +23,4 @@ export * from './isValidTimezone'
 export * from './getTimezoneOffset'
 export * from './moveAfter'
 
-export type { HMS, DHMS, TimeFormat, SecondsDisplay, CountdownFormatCode } from './types'
+export type { HMS, DHMS, SecondsDisplay, CountdownFormatCode } from './types'
