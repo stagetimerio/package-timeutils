@@ -12,7 +12,7 @@
  * isValidTimeZone('America/New_York') // true
  * isValidTimeZone('Invalid/Timezone') // false
  */
-export function isValidTimezone(tz: string): boolean {
+export function isValidTimezone (tz: string): boolean {
   if (!Intl || !Intl.DateTimeFormat().resolvedOptions().timeZone) {
     throw new Error('Time zones are not available in this environment')
   }

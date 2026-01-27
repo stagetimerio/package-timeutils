@@ -23,7 +23,7 @@ import { addDays } from 'date-fns/addDays'
  *
  * @throws {Error} - Throws an error if 'after' or 'now' options are provided but are not valid Date instances.
  */
-export default function parseDateAsToday(
+export default function parseDateAsToday (
   rawInput: Date | string,
   {
     timezone = undefined,
@@ -33,7 +33,7 @@ export default function parseDateAsToday(
     timezone?: string
     after?: Date
     now?: Date
-  } = {}
+  } = {},
 ): Date {
   // Validate parameters
   if (after !== undefined && !(after instanceof Date)) {

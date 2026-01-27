@@ -31,7 +31,7 @@ export function formatTimeOfDay (
     formatStr?: string
     seconds?: SecondsDisplay
     leadingZero?: boolean
-  } = {}
+  } = {},
 ): string {
   if (!(date instanceof Date)) return '--:--'
 

@@ -11,14 +11,14 @@ import { tz } from '@date-fns/tz'
  * @param  {string} [options.timezone]
  * @return {Date}
  */
-export function moveAfter(
+export function moveAfter (
   time: Date,
   after: Date,
   {
     timezone = 'UTC',
   }: {
     timezone?: string
-  } = {}
+  } = {},
 ): Date {
   if (!(time instanceof Date)) throw new Error('`time` must be an instance of Date')
   if (!(after instanceof Date)) throw new Error('`after` must be an instance of Date')

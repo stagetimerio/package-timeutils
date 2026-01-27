@@ -15,10 +15,10 @@ const localTz = Intl?.DateTimeFormat()?.resolvedOptions()?.timeZone
  * // Convert a date from Europe/Berlin timezone to America/Los_Angeles timezone
  * dateToTimezone(new Date('2024-02-22T08:00:00.000Z'), 'America/Los_Angeles', 'Europe/Berlin');
  */
-export default function dateToTimezone(
+export default function dateToTimezone (
   date: Date,
   targetTz = 'UTC',
-  sourceTz: string | undefined = localTz
+  sourceTz: string | undefined = localTz,
 ): Date {
   // Assume date in local environment
   // e.g.2024-02-22T08:00:00.000Z (9 AM Europe/Berlin)

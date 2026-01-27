@@ -17,10 +17,10 @@ type FormatOption = 'city' | 'long' | 'abbr' | 'offset'
  * @param {Date} date - The reference date used to determine the 'long', 'abbr' and 'offset'
  * @return {string} The formatted timezone string.
  */
-export default function formatTimezone(
+export default function formatTimezone (
   timezone: string,
   format: FormatOption | FormatOption[] = 'long',
-  date: Date = new Date()
+  date: Date = new Date(),
 ): string {
   if (!timezone) return ''
 
@@ -61,7 +61,7 @@ export default function formatTimezone(
       }
 
       default:
-        throw new Error("Format option must be one of 'city', 'long', 'abbr' or 'offset'")
+        throw new Error('Format option must be one of \'city\', \'long\', \'abbr\' or \'offset\'')
     }
   }
 

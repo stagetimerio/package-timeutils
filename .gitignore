@@ -3,6 +3,7 @@ node_modules
 dist
 .docker
 tests/tmp.js
+.claude/
 
 # local env files
 .env.local

@@ -1,5 +1,11 @@
-export default [
+import tseslint from 'typescript-eslint'
+
+export default tseslint.config(
   {
+    files: ['src/**/*.ts'],
+    extends: [
+      ...tseslint.configs.recommended,
+    ],
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'module',
@@ -8,10 +14,11 @@ export default [
       'no-console': process.env.NODE_ENV === 'production' ? ['warn', { allow: ['info', 'warn', 'error']}] : 'off',
       'no-debugger': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
       'comma-dangle': ['warn', 'always-multiline'],
-      'no-unused-vars': 'warn',
       'quotes': ['warn', 'single'],
       'semi': ['warn', 'never'],
-      'indent': ['warn', 2],
+      'indent': ['warn', 2, { SwitchCase: 1 }],
+      'space-before-function-paren': ['warn', 'always'],
+      '@typescript-eslint/no-unused-vars': 'warn',
     },
   },
 
@@ -21,4 +28,4 @@ export default [
       'dist/',
     ],
   },
-]
+)

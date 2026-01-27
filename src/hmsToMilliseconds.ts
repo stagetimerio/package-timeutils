@@ -1,4 +1,4 @@
-export default function hmsToMilliseconds({
+export default function hmsToMilliseconds ({
   hours = 0,
   minutes = 0,
   seconds = 0,

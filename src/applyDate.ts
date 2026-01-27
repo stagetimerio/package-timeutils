@@ -11,10 +11,10 @@ import { getTimezoneOffset } from './getTimezoneOffset'
  * @param  {string} [timezone] - an optional IANA timezone like 'Europe/Berlin'
  * @return {Date}
  */
-export function applyDate(
+export function applyDate (
   time: Date | string | null,
   date: Date | string | null,
-  timezone: string | undefined = undefined
+  timezone: string | undefined = undefined,
 ): Date | null {
   const timeInUTC = parseDate(time)
   const dateInUTC = parseDate(date)

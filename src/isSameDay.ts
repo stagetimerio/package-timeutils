@@ -11,10 +11,10 @@ const localTz = Intl?.DateTimeFormat()?.resolvedOptions()?.timeZone
  * @param {string} timezone - The IANA timezone string
  * @returns {boolean} - True if both dates are on the same day in the specified timezone; false otherwise
  */
-export default function isSameDay(
+export default function isSameDay (
   date1: Date,
   date2: Date,
-  timezone: string | undefined = localTz
+  timezone: string | undefined = localTz,
 ): boolean {
   return fnsIsSameDay(date1, date2, { in: tz(timezone ?? 'UTC') })
 }

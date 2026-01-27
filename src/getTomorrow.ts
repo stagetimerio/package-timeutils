@@ -8,9 +8,9 @@ import getToday from './getToday'
  * @param  {Date} [now] - provide a date for 'today', must be in UTC, used for testing
  * @return {Date}
  */
-export default function getTomorrow(
+export default function getTomorrow (
   timezone: string | undefined = undefined,
-  now: Date | undefined = undefined
+  now: Date | undefined = undefined,
 ): Date {
   const today = getToday(timezone, now)
   return addDays(today, 1)

@@ -1,4 +1,4 @@
-export default function dhmsToMilliseconds({
+export default function dhmsToMilliseconds ({
   negative = 0,
   days = 0,
   hours = 0,

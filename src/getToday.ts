@@ -11,9 +11,9 @@ import { addMilliseconds } from 'date-fns/addMilliseconds'
  * @param  {Date} [now] - provide a date for 'today', must be in UTC, used for testing
  * @return {Date}
  */
-export default function getToday(
+export default function getToday (
   timezone: string | undefined = undefined,
-  now: Date | undefined = undefined
+  now: Date | undefined = undefined,
 ): Date {
   if (now !== undefined && !(now instanceof Date)) {
     throw new Error('The 2nd argument must be undefined or an instance of date.')

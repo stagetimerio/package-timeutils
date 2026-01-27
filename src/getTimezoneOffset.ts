@@ -7,7 +7,10 @@ import { tzOffset } from '@date-fns/tz'
  * @param {Date} date - The date to get the offset for
  * @return {number} The offset in milliseconds
  */
-export function getTimezoneOffset(timezone: string, date: Date): number {
+export function getTimezoneOffset (
+  timezone: string,
+  date: Date,
+): number {
   if (!(date instanceof Date)) throw new Error('`date` must be a valid Date')
   if (typeof timezone !== 'string') throw new Error('`timezone` must be provided')
 

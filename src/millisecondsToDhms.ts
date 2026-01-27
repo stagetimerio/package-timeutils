@@ -1,8 +1,8 @@
 import type { DHMS } from './types'
 
-export default function millisecondsToDhms(
+export default function millisecondsToDhms (
   ms = 0,
-  { ceil = true }: { ceil?: boolean } = {}
+  { ceil = true }: { ceil?: boolean } = {},
 ): DHMS {
   const negative = ms < 0 ? 1 : 0
   const decimalMs = Math.abs(Math.floor(ms % 1000)) || 0

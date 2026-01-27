@@ -24,9 +24,9 @@ import isValidDate from './isValidDate'
  * // Parsing a full datetime string
  * parseDate('2023-01-01T12:00:00')
  */
-export default function parseDate(
+export default function parseDate (
   rawInput: unknown,
-  tz: string | undefined = undefined
+  tz: string | undefined = undefined,
 ): Date | null {
   if (typeof rawInput === 'boolean') return null
   if (rawInput === null || rawInput === undefined) return null
@@ -46,7 +46,7 @@ export default function parseDate(
     // Test for yyyy-MM-ddTHH:mm:ss
     const regex2 = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/
     if (regex2.test(rawInput))
-      return parse(rawInput, "yyyy-MM-dd'T'HH:mm:ss", new Date())
+      return parse(rawInput, 'yyyy-MM-dd\'T\'HH:mm:ss', new Date())
   }
 
   const parsedNative = new Date(rawInput as string | number)
