@@ -36,13 +36,28 @@ describe('formatDuration', () => {
 
   describe('MMMSSF format', () => {
     test('5 minutes 30.5 seconds', () => {
-      expect(formatDuration(330500, { format: 'MMMSSF', ceil: false })).to.equal('5:30.5')
+      expect(formatDuration(330500, { format: 'MMMSSF' })).to.equal('5:30.5')
     })
   })
 
   describe('HHHMMSSF format', () => {
     test('1 hour 30 minutes 59.5 seconds', () => {
-      expect(formatDuration(5459500, { format: 'HHHMMSSF', ceil: false })).to.equal('1:30:59.5')
+      expect(formatDuration(5459500, { format: 'HHHMMSSF' })).to.equal('1:30:59.5')
+    })
+  })
+
+  describe('ceil forced false for fractional formats', () => {
+    test('F format auto-disables ceil', () => {
+      // Without the fix, ceil=true would round 330500ms (5:30.5) to 331s → "5:31.5"
+      expect(formatDuration(330500, { format: 'MMMSSF' })).to.equal('5:30.5')
+    })
+
+    test('explicit ceil=true is overridden by F format', () => {
+      expect(formatDuration(330500, { format: 'MMMSSF', ceil: true })).to.equal('5:30.5')
+    })
+
+    test('non-F format still ceils by default', () => {
+      expect(formatDuration(330500, { format: 'MMMSS' })).to.equal('5:31')
     })
   })
 

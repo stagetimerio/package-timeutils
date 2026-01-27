@@ -12,7 +12,7 @@ import type { DurationFormat, ZeroDisplay } from './types'
  * @param options.overtimePrefix – Prefix for negative durations (default: '' — no prefix)
  * @param options.leadingZeros – Show zero-value components at the left: 'always' | 'nonzero' | 'never' (default: 'nonzero')
  * @param options.trailingZeros – Show zero-value components at the right: 'always' | 'nonzero' | 'never' (default: 'always')
- * @param options.ceil – Round sub-second values up (default: true)
+ * @param options.ceil – Round sub-second values up (default: true, forced false when format includes 'F')
  * @returns Formatted duration string, or '' for invalid input
  *
  * @example formatDuration(5400000) // '1:30:00'
@@ -36,7 +36,8 @@ export function formatDuration (
   } = {},
 ): string {
   if (typeof ms !== 'number' || isNaN(ms)) return ''
-  const dhms = millisecondsToDhms(ms, { ceil })
+  const showDecimals = format.includes('F')
+  const dhms = millisecondsToDhms(ms, { ceil: showDecimals ? false : ceil })
   const digits = dhmsToDigits(dhms, { format, overtimePrefix, leadingZeros, trailingZeros })
   return digits.join('').trim()
 }
