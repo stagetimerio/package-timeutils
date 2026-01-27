@@ -5,8 +5,8 @@ import type { SecondsDisplay } from './types'
 /**
  * Check whether a format string includes seconds (`:ss`)
  */
-export function formatStrHasSeconds (formatStr: string): boolean {
-  return formatStr.includes(':ss')
+export function formatHasSeconds (format: string): boolean {
+  return format.includes(':ss')
 }
 
 /**
@@ -14,7 +14,7 @@ export function formatStrHasSeconds (formatStr: string): boolean {
  *
  * @param  {Date}    date - The date object to format
  * @param  {string}  [options.timezone = 'UTC'] - The IANA timezone name, e.g., 'America/New_York'
- * @param  {string}  [options.formatStr = 'H:mm:ss'] - A date-fns format string (e.g., 'H:mm:ss', 'h:mm aa')
+ * @param  {string}  [options.format = 'H:mm:ss'] - A date-fns format string (e.g., 'H:mm:ss', 'h:mm aa')
  * @param  {string}  [options.seconds] - Override: 'nonzero' | 'never' (most restrictive wins)
  * @param  {boolean} [options.leadingZero = false] - Whether to display leading zero in hours
  * @return {string} - The formatted time string
@@ -23,22 +23,22 @@ export function formatTimeOfDay (
   date: Date,
   {
     timezone = 'UTC',
-    formatStr = 'H:mm:ss',
+    format = 'H:mm:ss',
     seconds,
     leadingZero = false,
   }: {
     timezone?: string
-    formatStr?: string
+    format?: string
     seconds?: SecondsDisplay
     leadingZero?: boolean
   } = {},
 ): string {
   if (!(date instanceof Date)) return '--:--'
 
-  let fmt = formatStr
+  let fmt = format
 
   // 1. Apply seconds override (most restrictive wins)
-  if (formatStrHasSeconds(fmt)) {
+  if (formatHasSeconds(fmt)) {
     if (seconds === 'never' || (seconds === 'nonzero' && getSeconds(date) === 0)) {
       fmt = fmt.replace(':ss', '')
     }
