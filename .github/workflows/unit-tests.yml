@@ -41,4 +41,3 @@ jobs:
         run: npm run test:ci 2>&1 | tee $GITHUB_STEP_SUMMARY; exit ${PIPESTATUS[0]}
         env:
           TZ: ${{ matrix.timezone }}
-          NODE_OPTIONS: --experimental-vm-modules
