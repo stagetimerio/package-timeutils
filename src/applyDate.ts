@@ -29,13 +29,10 @@ export function applyDate (
   const dateInZone = addMilliseconds(dateInUTC, dateOffset)
 
   // Perform the actual applying of the date
-  // Note: Set day to 1 first to avoid month overflow (e.g., Dec 31 → Feb 31 → March 2/3)
+  // Note: Set year, month, day atomically to avoid month overflow (e.g., Dec 31 → Feb 31 → March 2/3)
   // Note: Has to use the UTC variants to avoid interference of system timezone
   const outputInZone = new Date(timeInZone)
-  outputInZone.setUTCDate(1)
-  outputInZone.setUTCFullYear(dateInZone.getUTCFullYear())
-  outputInZone.setUTCMonth(dateInZone.getUTCMonth())
-  outputInZone.setUTCDate(dateInZone.getUTCDate())
+  outputInZone.setUTCFullYear(dateInZone.getUTCFullYear(), dateInZone.getUTCMonth(), dateInZone.getUTCDate())
 
   // Change output from sepcified timezone back to UTC
   const outputOffset = getTimezoneOffset(tz, addMilliseconds(outputInZone, -dateOffset))

@@ -204,4 +204,54 @@ describe('applyDate', () => {
     const output = applyDate(inTime, inDate)
     expect(output).to.deep.equal(new Date('2020-02-29T10:15:00.000Z'))
   })
+
+  // On 2025-03-30 in Europe/Berlin, clocks jump from 02:00 CET (+1h) to 03:00 CEST (+2h).
+  // time is 01:00 CET on March 28 (offset +1h, different day)
+  // date is noon CEST on March 30 (offset +2h, after switch)
+  // Output should be 01:00 CET on March 30 (before the switch on that day), so offset +1h.
+  // If dateOffset (+2h) is reused instead of recalculated, result is 1 hour off.
+  test('Bug: DST-crossing offset - time on pre-DST day, date on DST-switch day after switch', () => {
+    const inTime = new Date('2025-03-28T00:00:00.000Z') // Mar 28 01:00 CET (offset +1h)
+    const inDate = new Date('2025-03-30T10:00:00.000Z') // Mar 30 12:00 CEST (offset +2h)
+    const output = applyDate(inTime, inDate, 'Europe/Berlin')
+    // Output: Mar 30 01:00 CET = 2025-03-30T00:00:00Z (offset +1h, before DST switch)
+    expect(output).to.deep.equal(new Date('2025-03-30T00:00:00.000Z'))
+  })
+
+  // Reported bug: User selects Feb 3 as finish date but field shows 2026-03-03.
+  // The finish time was on Jan 31, so applying Feb 3 caused: Jan 31 → set month to Feb → Feb 31 → March 3.
+  test('Bug: Reported - Jan 31 finish time, select Feb 3 date (w/o timezone)', () => {
+    const inTime = new Date('2026-01-31T10:00:00.000Z')
+    const inDate = new Date('2026-02-03T00:00:00.000Z')
+    const output = applyDate(inTime, inDate)
+    expect(output).to.deep.equal(new Date('2026-02-03T10:00:00.000Z'))
+  })
+
+  test('Bug: Reported - Jan 31 finish time, select Feb 3 date (UTC)', () => {
+    const inTime = new Date('2026-01-31T10:00:00.000Z')
+    const inDate = new Date('2026-02-03T00:00:00.000Z')
+    const output = applyDate(inTime, inDate, 'UTC')
+    expect(output).to.deep.equal(new Date('2026-02-03T10:00:00.000Z'))
+  })
+
+  test('Bug: Reported - Jan 31 finish time, select Feb 3 date (America/Los_Angeles)', () => {
+    const inTime = new Date('2026-01-31T18:00:00.000Z') // Jan 31 10:00 PST
+    const inDate = new Date('2026-02-03T08:00:00.000Z') // Feb 3 00:00 PST
+    const output = applyDate(inTime, inDate, 'America/Los_Angeles')
+    expect(output).to.deep.equal(new Date('2026-02-03T18:00:00.000Z')) // Feb 3 10:00 PST
+  })
+
+  test('Bug: Reported - Jan 31 finish time, select Feb 3 date (Europe/Berlin)', () => {
+    const inTime = new Date('2026-01-31T09:00:00.000Z') // Jan 31 10:00 CET
+    const inDate = new Date('2026-02-02T23:00:00.000Z') // Feb 3 00:00 CET
+    const output = applyDate(inTime, inDate, 'Europe/Berlin')
+    expect(output).to.deep.equal(new Date('2026-02-03T09:00:00.000Z')) // Feb 3 10:00 CET
+  })
+
+  test('Bug: Reported - Jan 31 finish time, select Feb 3 date (Australia/Sydney)', () => {
+    const inTime = new Date('2026-01-30T23:00:00.000Z') // Jan 31 10:00 AEDT
+    const inDate = new Date('2026-02-02T13:00:00.000Z') // Feb 3 00:00 AEDT
+    const output = applyDate(inTime, inDate, 'Australia/Sydney')
+    expect(output).to.deep.equal(new Date('2026-02-02T23:00:00.000Z')) // Feb 3 10:00 AEDT
+  })
 })
