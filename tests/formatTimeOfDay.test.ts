@@ -7,6 +7,8 @@ const DATE_WITH_SECONDS = new Date('2023-06-17T15:10:30Z')
 const DATE_NO_SECONDS = new Date('2023-06-17T15:10:00Z')
 // Test date for leading zero: 2023-06-17T05:10:30Z (5:10:30 AM UTC)
 const DATE_SINGLE_DIGIT_HOUR = new Date('2023-06-17T05:10:30Z')
+// Test date with milliseconds: 2023-06-17T15:10:30.750Z (tenths = 7)
+const DATE_WITH_MILLIS = new Date('2023-06-17T15:10:30.750Z')
 
 describe('formatHasSeconds', () => {
   it('should return true for formats with :ss', () => {
@@ -103,6 +105,28 @@ describe('formatTimeOfDay', () => {
 
       it('should not affect h:mm aa (already no seconds)', () => {
         expect(formatTimeOfDay(DATE_WITH_SECONDS, { format: 'h:mm aa', seconds: 'never' })).to.equal('3:10 PM')
+      })
+    })
+
+    describe('seconds: "always"', () => {
+      it('should keep seconds in H:mm:ss (already has them)', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { format: 'H:mm:ss', seconds: 'always' })).to.equal('15:10:30')
+      })
+
+      it('should add seconds to H:mm', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { format: 'H:mm', seconds: 'always' })).to.equal('15:10:30')
+      })
+
+      it('should add seconds to h:mm aa', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { format: 'h:mm aa', seconds: 'always' })).to.equal('3:10:30 PM')
+      })
+
+      it('should add seconds to h:mm', () => {
+        expect(formatTimeOfDay(DATE_WITH_SECONDS, { format: 'h:mm', seconds: 'always' })).to.equal('3:10:30')
+      })
+
+      it('should show zero seconds', () => {
+        expect(formatTimeOfDay(DATE_NO_SECONDS, { format: 'H:mm', seconds: 'always' })).to.equal('15:10:00')
       })
     })
 
@@ -203,6 +227,36 @@ describe('formatTimeOfDay', () => {
 
       it('should format 12h AM/PM correctly', () => {
         expect(formatTimeOfDay(DATE_WITH_SECONDS, { format: 'h:mm:ss aa', timezone: 'America/Los_Angeles' })).to.equal('8:10:30 AM')
+      })
+    })
+  })
+
+  // ── tenths override ──────────────────────────────────────────────
+
+  describe('tenths override', () => {
+    describe('tenths: "always"', () => {
+      it('should append tenths to 24h format', () => {
+        expect(formatTimeOfDay(DATE_WITH_MILLIS, { format: 'H:mm:ss', tenths: 'always' })).to.equal('15:10:30.7')
+      })
+
+      it('should append tenths to 12h AM/PM format', () => {
+        expect(formatTimeOfDay(DATE_WITH_MILLIS, { format: 'h:mm:ss aa', tenths: 'always' })).to.equal('3:10:30.7 PM')
+      })
+
+      it('should append tenths to format without seconds', () => {
+        expect(formatTimeOfDay(DATE_WITH_MILLIS, { format: 'H:mm', tenths: 'always' })).to.equal('15:10.7')
+      })
+
+      it('should show 0 tenths when milliseconds are 0', () => {
+        expect(formatTimeOfDay(DATE_NO_SECONDS, { format: 'H:mm:ss', tenths: 'always' })).to.equal('15:10:00.0')
+      })
+
+      it('should work with seconds: "always" combined', () => {
+        expect(formatTimeOfDay(DATE_WITH_MILLIS, { format: 'H:mm', seconds: 'always', tenths: 'always' })).to.equal('15:10:30.7')
+      })
+
+      it('should work with seconds: "always" combined for 12h AM/PM', () => {
+        expect(formatTimeOfDay(DATE_WITH_MILLIS, { format: 'h:mm aa', seconds: 'always', tenths: 'always' })).to.equal('3:10:30.7 PM')
       })
     })
   })

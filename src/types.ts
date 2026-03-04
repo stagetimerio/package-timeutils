@@ -10,7 +10,21 @@ export interface DHMS extends HMS {
   days: number
 }
 
-export type SecondsDisplay = 'nonzero' | 'never'
+/**
+ * Controls seconds display in time-of-day formatting.
+ * - undefined: respect the format string as-is (default)
+ * - 'always':  force seconds even if the format lacks :ss
+ * - 'nonzero': show seconds only when non-zero (strip :ss when seconds = 0)
+ * - 'never':   always strip :ss from the format
+ */
+export type SecondsDisplay = 'always' | 'nonzero' | 'never'
+
+/**
+ * Controls tenths-of-a-second display in time-of-day formatting.
+ * - undefined: no tenths shown (default)
+ * - 'always':  append .{tenths} to the formatted time
+ */
+export type TenthsDisplay = 'always'
 
 /**
  * Duration format string. Parsed character-by-character via .includes():

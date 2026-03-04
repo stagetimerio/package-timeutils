@@ -25,4 +25,4 @@ export * from './isValidTimezone'
 export * from './getTimezoneOffset'
 export * from './moveAfter'
 
-export type { HMS, DHMS, SecondsDisplay, DurationFormat, ZeroDisplay } from './types'
+export type { HMS, DHMS, SecondsDisplay, TenthsDisplay, DurationFormat, ZeroDisplay } from './types'
