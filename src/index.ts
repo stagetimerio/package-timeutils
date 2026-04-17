@@ -16,6 +16,18 @@ export { default as parseDateAsToday } from './parseDateAsToday'
 export { default as abbreviations } from './abbreviations'
 export { default as formatTimezone } from './formatTimezone'
 export { default as isSameDay } from './isSameDay'
+export { fastDeepEqual } from './fastDeepEqual'
+export { default as createTimestamps } from './createTimestamps'
+export type {
+  TimerType,
+  TimerTrigger,
+  TimestampState,
+  TimerInput,
+  TimesetInput,
+  MemoryTimerEntry,
+  MemoryInput,
+  Timestamp,
+} from './createTimestamps'
 export * from './applyDate'
 export * from './formatTimeOfDay'
 export * from './dhmsToDigits'
