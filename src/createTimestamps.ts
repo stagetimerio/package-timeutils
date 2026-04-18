@@ -1,14 +1,24 @@
 import hmsToMilliseconds from './hmsToMilliseconds'
 import parseDateAsToday from './parseDateAsToday'
+import parseCalendarDay from './parseCalendarDay'
 import { applyDate } from './applyDate'
-import getToday from './getToday'
-import { addDays } from 'date-fns/addDays'
 import { addMinutes } from 'date-fns/addMinutes'
 
 // --- Types ---------------------------------------------------------------
 
 export type TimerType = 'DURATION' | 'FINISH_TIME' | 'TIME_WARP'
 export type TimerTrigger = 'MANUAL' | 'LINKED' | 'SCHEDULED'
+/**
+ * Purely positional, relative to the active timer in the list:
+ *   - `ACTIVE` — `timeset.timerId` matches this timer
+ *   - `PAST`   — index is before the active timer
+ *   - `FUTURE` — index is after the active timer
+ *
+ * Fallback when no timer is active: `PAST` iff the timer has memory, else
+ * `FUTURE`. Memory presence is carried separately by `hasMemory`, so a PAST
+ * timer without memory (skipped) and a FUTURE timer with memory (jumped
+ * back from) are both valid and meaningful.
+ */
 export type TimestampState = 'PAST' | 'ACTIVE' | 'FUTURE'
 
 export interface TimerInput {
@@ -43,19 +53,55 @@ export interface MemoryTimerEntry {
 
 export interface MemoryInput {
   driftResetAt?: number | null
-  timers?: Record<string, MemoryTimerEntry> | Map<string, MemoryTimerEntry>
+  timers?: Record<string, MemoryTimerEntry>
 }
 
+/**
+ * Per-timer output of `createTimestamps`. All time fields are epoch ms.
+ *
+ * `planned` and `actual` are two independent chains. `drift` (entering delta)
+ * and `overUnder` (exiting delta) emerge between them, both quantised to
+ * 500ms and bidirectional (negative = ahead of schedule).
+ *
+ * Event-level totals read from the endpoints — the actual chain already
+ * carries accumulated deviation forward, so summing would double-count:
+ *   eventActualFinish = last.actual.finish
+ *   eventOverUnder    = last.overUnder
+ *
+ * On back-to-back chains `drift[i+1] === overUnder[i]`; a scheduled gap or a
+ * previous under-run resets drift to 0 at the boundary (unless LINKED).
+ * FINISH_TIME anchors absorb drift into their duration and clamp `overUnder`
+ * to 0 until drift exceeds the slot.
+ */
 export interface Timestamp {
+  /** Timer's `_id`, passed through from input. */
   timerId: string | number
+
+  /** Positional label (see `TimestampState`). Orthogonal to `hasMemory`. */
   state: TimestampState
+
+  /** Scheduled times from current timer config. */
   planned: { start: number, finish: number, duration: number }
+
+  /** Realised times: memory for PAST, kickoff+live for ACTIVE, projected for FUTURE. */
   actual: { start: number, finish: number, duration: number }
+
+  /** `actual.start - planned.start`. Baseline pinned to memory snapshot when present. */
   drift: number
+
+  /** `actual.finish - planned.finish`. Grows live on the ACTIVE timer past its end. */
   overUnder: number
+
+  /** Planned gap before this timer (`planned.start - prev.planned.finish`). 0 for the first. */
   gap: number
+
+  /** Timer has a real memory entry (`finish != null`). Orthogonal to `state`. */
   hasMemory: boolean
+
+  /** Timer has a `startTime` anchor — render separately, and a preceding `gap` is a scheduled pause. */
   explicitStart: boolean
+
+  /** Timer is `FINISH_TIME` — wall-clock anchored finish, drift-absorbing. */
   explicitFinish: boolean
 }
 
@@ -73,26 +119,32 @@ const TIMER_TRIGGERS = {
   SCHEDULED: 'SCHEDULED' as const,
 }
 
+// Quantise drift/overUnder to this grain (truncated toward zero, see roundDrift).
+// Keeps values stable across `now` ticks so fastDeepEqual can short-circuit;
+// sub-threshold drift reads as 0.
 const DRIFT_ROUND_MS = 500
 
 // --- Helpers -------------------------------------------------------------
 
+/**
+ * Normalise a mixed number | Date input to epoch ms.
+ * null/undefined/garbage → null.
+ */
 function toMs (value: number | Date | null | undefined): number | null {
   if (value == null) return null
   if (value instanceof Date) return value.getTime()
   return typeof value === 'number' ? value : null
 }
 
-function resolveTimerDate (
-  roomDate: string | null,
-  datePlus: number = 0,
-  timezone?: string,
-): Date {
-  const referenceDate = roomDate ? new Date(roomDate + 'T12:00:00Z') : undefined
-  const baseDate = getToday(timezone, referenceDate)
-  return datePlus ? addDays(baseDate, datePlus) : baseDate
-}
-
+/**
+ * Resolve a timer's anchored startTime/finishTime (a wall-clock string) to an
+ * absolute epoch ms, applying roomDate/datePlus shifts when present.
+ *
+ * The 30-minute rewind on prevFinish lets parseDateAsToday pick the correct
+ * "today" reference when a timer's anchor slightly predates the previous
+ * finish (a common UX pattern, e.g. scheduling back-to-back cues where
+ * clocks overlap).
+ */
 function resolveAnchoredTime (
   rawInput: string | Date,
   datePlus: number,
@@ -108,23 +160,16 @@ function resolveAnchoredTime (
   })
   let result: Date | null = parsed
   if (datePlus > 0 || roomDate) {
-    const targetDate = resolveTimerDate(roomDate, datePlus, timezone)
+    const targetDate = parseCalendarDay(roomDate, { datePlus, timezone })
     result = applyDate(result, targetDate, timezone)
   }
   return result ? result.getTime() : 0
 }
 
-function memoryEntryOf (
-  memory: MemoryInput | undefined,
-  timerId: string | number,
-): MemoryTimerEntry | null {
-  if (!memory || !memory.timers) return null
-  const key = String(timerId)
-  const timers = memory.timers
-  if (timers instanceof Map) return timers.get(key) ?? null
-  return (timers as Record<string, MemoryTimerEntry>)[key] ?? null
-}
-
+/**
+ * Truncate toward zero at DRIFT_ROUND_MS grain — symmetric for negative drift
+ * (ahead of schedule). Math.floor would round -749ms to -1000ms, overstating.
+ */
 function roundDrift (ms: number): number {
   const sign = ms < 0 ? -1 : 1
   return sign * Math.floor(Math.abs(ms) / DRIFT_ROUND_MS) * DRIFT_ROUND_MS
@@ -136,10 +181,15 @@ function roundDrift (ms: number): number {
  * Build planned + actual timestamp chain for a list of timers.
  *
  * The planned chain walks from the current timer config (startTime anchors,
- * durations, FINISH_TIME). The actual chain walks independently, fed by
- * memory for PAST timers, kickoff for ACTIVE, and drift propagation for
- * FUTURE timers. `drift` and `overUnder` emerge as the difference between
- * the two chains.
+ * durations, FINISH_TIME). The actual chain walks independently, driven by
+ * three orthogonal signals per timer:
+ *   - `isActive` → kickoff + live-clamped finish
+ *   - `hasMemory` → recorded values from the memory entry
+ *   - otherwise → projection from prev.actual.finish
+ *
+ * `drift` and `overUnder` emerge as the difference between the two chains.
+ * `state` is a purely positional label for consumers; it does not steer the
+ * actual-chain computation.
  */
 export default function createTimestamps (
   timers: TimerInput[],
@@ -155,6 +205,13 @@ export default function createTimestamps (
   const kickoffMs = toMs(timeset.kickoff)
   const driftResetAt = memory.driftResetAt ?? null
 
+  // Locate the active timer's index up front — `state` is positional relative
+  // to it. When there is no active timer (event paused / not started), fall
+  // back to a memory-based classification so ended events still read sensibly.
+  const activeIdx = timeset.timerId != null
+    ? timers.findIndex(t => String(t._id) === String(timeset.timerId))
+    : -1
+
   // Planned chain state
   let prevPlannedFinish: number = 0
 
@@ -164,16 +221,16 @@ export default function createTimestamps (
 
   const out: Timestamp[] = []
 
-  for (const timer of timers) {
-    const memoryEntry = memoryEntryOf(memory, timer._id)
-    const hasMemoryFinish = !!(memoryEntry && memoryEntry.finish != null)
+  for (let i = 0; i < timers.length; i++) {
+    const timer = timers[i]!
+    const memoryEntry = memory.timers?.[String(timer._id)] ?? null
+    const hasMemory = !!(memoryEntry && memoryEntry.finish != null)
 
-    const isActive = timeset.timerId != null && String(timeset.timerId) === String(timer._id)
-
-    const state: TimestampState = isActive
-      ? 'ACTIVE'
-      : hasMemoryFinish ? 'PAST' : 'FUTURE'
-    const hasMemory = state === 'PAST' && hasMemoryFinish
+    const isActive = i === activeIdx
+    let state: TimestampState
+    if (isActive) state = 'ACTIVE'
+    else if (activeIdx >= 0) state = i < activeIdx ? 'PAST' : 'FUTURE'
+    else state = hasMemory ? 'PAST' : 'FUTURE'
 
     // ---------------------------------------------------------------------
     // 1. Planned chain (current config)
@@ -237,7 +294,24 @@ export default function createTimestamps (
     let actualFinish: number
     let actualDuration: number
 
-    if (state === 'PAST' && hasMemory) {
+    // Actual chain branches on three orthogonal signals:
+    //   isActive   → live kickoff + clamped-to-now finish
+    //   hasMemory  → use recorded values (works for PAST-with-mem and the
+    //                rare FUTURE-with-mem case after a jump-back)
+    //   otherwise  → project forward from prev.actual.finish (covers
+    //                FUTURE-no-mem AND skipped PAST-no-mem; drift propagates)
+    if (isActive) {
+      actualStart = kickoffMs ?? plannedStart
+      if (timer.type === TIMER_TYPES.FINISH_TIME) {
+        const baseFinish = Math.max(plannedFinish, actualStart)
+        actualFinish = Math.max(baseFinish, now)
+        actualDuration = Math.max(0, actualFinish - actualStart)
+      } else {
+        const scheduled = actualStart + plannedDuration
+        actualFinish = Math.max(scheduled, now)
+        actualDuration = Math.max(0, actualFinish - actualStart)
+      }
+    } else if (hasMemory) {
       const memStart = memoryEntry!.start ?? memoryEntry!.finish! - (memoryEntry!.elapsed ?? 0)
       const memFinish = memoryEntry!.finish!
       const beforeReset = driftResetAt != null && memStart < driftResetAt
@@ -251,24 +325,7 @@ export default function createTimestamps (
         actualFinish = memFinish
         actualDuration = memoryEntry!.elapsed ?? (memFinish - memStart)
       }
-    } else if (state === 'PAST') {
-      // PAST without memory — treat as if it ran exactly as planned
-      actualStart = plannedStart
-      actualFinish = plannedFinish
-      actualDuration = plannedDuration
-    } else if (state === 'ACTIVE') {
-      actualStart = kickoffMs ?? plannedStart
-      if (timer.type === TIMER_TYPES.FINISH_TIME) {
-        const baseFinish = Math.max(plannedFinish, actualStart)
-        actualFinish = Math.max(baseFinish, now)
-        actualDuration = Math.max(0, actualFinish - actualStart)
-      } else {
-        const scheduled = actualStart + plannedDuration
-        actualFinish = Math.max(scheduled, now)
-        actualDuration = Math.max(0, actualFinish - actualStart)
-      }
     } else {
-      // FUTURE
       if (timer.trigger === TIMER_TRIGGERS.LINKED && prevActualExists) {
         actualStart = prevActualFinish
       } else if (prevActualExists) {

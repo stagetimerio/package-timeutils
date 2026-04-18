@@ -260,8 +260,9 @@ describe('createTimestamps', () => {
       expect(ts[0].drift).toBe(min(2))
     })
 
-    it('PAST without memory treats actual = planned, drift = 0', () => {
-      // Active is timer 3, timer 1 and 2 have no memory entries (skipped)
+    it('skipped PAST (positionally past, no memory) chains from prev, drift = 0', () => {
+      // Active is timer 3, timer 1 and 2 have no memory entries (skipped).
+      // State is positional → t1 and t2 are PAST; hasMemory flags them as unrun.
       timers[0].startTime = new Date(THREE_PM)
       timeset.timerId = '3'
       timeset.running = true
@@ -272,9 +273,13 @@ describe('createTimestamps', () => {
         },
       }
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(6), null, memory)
-      // t1 and t2 have no memory.finish → state=FUTURE (not PAST)
-      expect(ts[0].state).toBe('FUTURE')
+      expect(ts[0].state).toBe('PAST')
+      expect(ts[0].hasMemory).toBe(false)
+      expect(ts[1].state).toBe('PAST')
+      expect(ts[1].hasMemory).toBe(false)
       expect(ts[0].drift).toBe(0)
+      expect(ts[1].drift).toBe(0)
+      expect(ts[2].state).toBe('ACTIVE')
     })
 
     it('uses snapshot plannedStart as drift baseline', () => {
