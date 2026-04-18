@@ -200,12 +200,14 @@ export function createTimestamps (
     let actualFinish: number
     let actualDuration: number
 
-    // Actual chain branches on three orthogonal signals:
-    //   isActive   → live kickoff + clamped-to-now finish
-    //   hasMemory  → use recorded values (works for PAST-with-mem and the
-    //                rare FUTURE-with-mem case after a jump-back)
-    //   otherwise  → project forward from prev.actual.finish (covers
-    //                FUTURE-no-mem AND skipped PAST-no-mem; drift propagates)
+    // Actual chain branches on positional state + memory presence:
+    //   isActive              → live kickoff + clamped-to-now finish
+    //   PAST + hasMemory      → use recorded values (actually ran)
+    //   otherwise             → project forward from prev.actual.finish
+    //     covers: FUTURE (incl. stale memory from a jump-back — memory is
+    //     preserved on disk for the resume feature but ignored here since
+    //     the timer has not yet played in the current pass), and skipped
+    //     PAST-no-mem (zero-duration, see below).
     if (isActive) {
       actualStart = kickoffMs ?? plannedStart
       if (timer.type === TIMER_TYPES.FINISH_TIME) {
@@ -217,7 +219,7 @@ export function createTimestamps (
         actualFinish = Math.max(scheduled, now)
         actualDuration = Math.max(0, actualFinish - actualStart)
       }
-    } else if (hasMemory) {
+    } else if (state === 'PAST' && hasMemory) {
       const memStart = memoryEntry!.start ?? memoryEntry!.finish! - (memoryEntry!.elapsed ?? 0)
       const memFinish = memoryEntry!.finish!
       const beforeReset = driftResetAt != null && memStart < driftResetAt
@@ -240,7 +242,12 @@ export function createTimestamps (
         actualStart = plannedStart
       }
 
-      if (timer.type === TIMER_TYPES.FINISH_TIME) {
+      if (state === 'PAST') {
+        // Skipped: user advanced past this timer without running it.
+        // Collapse to zero duration so recovered time reduces overUnder.
+        actualFinish = actualStart
+        actualDuration = 0
+      } else if (timer.type === TIMER_TYPES.FINISH_TIME) {
         actualFinish = Math.max(plannedFinish, actualStart)
         actualDuration = Math.max(0, actualFinish - actualStart)
       } else {

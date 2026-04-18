@@ -279,6 +279,71 @@ describe('createTimestamps', () => {
       expect(ts[2].state).toBe('ACTIVE')
     })
 
+    it('skipped timer has zero actual duration, recovers overUnder', () => {
+      // Scenario: A ran long (+8min over), B skipped to recover time, C now active.
+      // Expect B.actual.duration == 0, B.drift == +8min (inherited), B.overUnder == -2min.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '3'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(18) // C started at 3:18 (8min late)
+      const memory: MemoryInput = {
+        timers: {
+          '1': { start: THREE_PM, finish: THREE_PM + min(18), elapsed: min(18) }, // A ran 18min
+          '3': { start: THREE_PM + min(18), finish: null, elapsed: 0 },
+        },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(19), null, memory)
+
+      // A — PAST with memory, ran 8 min over
+      expect(ts[0].state).toBe('PAST')
+      expect(ts[0].hasMemory).toBe(true)
+      expect(ts[0].overUnder).toBe(min(8))
+
+      // B — skipped: zero duration, drift inherited, overUnder recovers
+      expect(ts[1].state).toBe('PAST')
+      expect(ts[1].hasMemory).toBe(false)
+      expect(ts[1].actual.start).toBe(THREE_PM + min(18))
+      expect(ts[1].actual.finish).toBe(THREE_PM + min(18))
+      expect(ts[1].actual.duration).toBe(0)
+      expect(ts[1].drift).toBe(min(8))       // propagated from A
+      expect(ts[1].overUnder).toBe(-min(2))  // 3:18 − 3:20 = recovered 10 min of 8 over
+
+      // C — active
+      expect(ts[2].state).toBe('ACTIVE')
+    })
+
+    it('FUTURE with stale memory (jumped back) ignores memory, projects normally', () => {
+      // Show ran A→B→C, then jumped back to A. B and C are positionally FUTURE
+      // again but still carry memory from the prior pass (kept on disk for
+      // resume). Timestamp output must treat them as not-yet-played.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(30) // jumped back at 3:30, A restarted
+      const memory: MemoryInput = {
+        timers: {
+          '1': { start: THREE_PM + min(30), finish: null, elapsed: 0 }, // fresh
+          '2': { start: THREE_PM + min(10), finish: THREE_PM + min(20), elapsed: min(10) }, // stale
+          '3': { start: THREE_PM + min(20), finish: THREE_PM + min(30), elapsed: min(10) }, // stale
+        },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(31), null, memory)
+
+      // B — FUTURE, hasMemory flag preserved but actual comes from projection
+      expect(ts[1].state).toBe('FUTURE')
+      expect(ts[1].hasMemory).toBe(true)
+      // Projects from active A: kickoff 3:30 + 10min = 3:40
+      expect(ts[1].actual.start).toBe(THREE_PM + min(40))
+      expect(ts[1].actual.finish).toBe(THREE_PM + min(50))
+      expect(ts[1].actual.duration).toBe(min(10))
+
+      // C — FUTURE, same treatment
+      expect(ts[2].state).toBe('FUTURE')
+      expect(ts[2].hasMemory).toBe(true)
+      expect(ts[2].actual.start).toBe(THREE_PM + min(50))
+      expect(ts[2].actual.finish).toBe(THREE_PM + min(60))
+    })
+
     it('uses snapshot plannedStart as drift baseline', () => {
       timers[0].startTime = new Date(THREE_PM)
       // User edited timer duration AFTER it ran; snapshot preserves the original planned values
