@@ -344,6 +344,29 @@ describe('createTimestamps', () => {
       expect(ts[2].actual.finish).toBe(THREE_PM + min(60))
     })
 
+    it('paused PAST timer: actual.duration is wall-clock (finish - start), not elapsed', () => {
+      // Timer A kicked off at 3:00, ran 3 min, paused, transitioned at 3:20.
+      // memory.elapsed = 3 min (resume layer) but wall-clock occupancy = 20 min.
+      // Schedule layer must reflect the 20-min slot; elapsed stays in memory
+      // for the resume/countdown path.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '2'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(20)
+      const memory: MemoryInput = {
+        timers: {
+          '1': { start: THREE_PM, finish: THREE_PM + min(20), elapsed: min(3) },
+        },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(21), null, memory)
+      expect(ts[0].state).toBe('PAST')
+      expect(ts[0].hasMemory).toBe(true)
+      expect(ts[0].actual.start).toBe(THREE_PM)
+      expect(ts[0].actual.finish).toBe(THREE_PM + min(20))
+      expect(ts[0].actual.duration).toBe(min(20)) // wall-clock, NOT elapsed (3min)
+      expect(ts[0].finishDrift).toBe(min(10)) // planned was 10min, slot took 20min
+    })
+
     it('uses snapshot plannedStart as drift baseline', () => {
       timers[0].startTime = new Date(THREE_PM)
       // User edited timer duration AFTER it ran; snapshot preserves the original planned values

@@ -229,9 +229,14 @@ export function createTimestamps (
         actualFinish = driftBaselineFinish
         actualDuration = driftBaselineFinish - driftBaselineStart
       } else {
+        // `actual.duration` is wall-clock (finish - start) to keep the
+        // identity `actual.finish - actual.start === actual.duration` consistent
+        // across all output rows. `memory.elapsed` is the resume-layer concern
+        // (countdown time excluding pauses) — consumers read it from memory
+        // directly if they need it.
         actualStart = memStart
         actualFinish = memFinish
-        actualDuration = memoryEntry!.elapsed ?? (memFinish - memStart)
+        actualDuration = memFinish - memStart
       }
     } else {
       if (timer.trigger === TIMER_TRIGGERS.LINKED && prevActualExists) {

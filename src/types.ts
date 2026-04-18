@@ -90,6 +90,26 @@ export interface TimesetInput {
   deadline?: number | Date | null
 }
 
+/**
+ * Per-timer memory entry. Serves two orthogonal roles:
+ *
+ *   Schedule-history layer (drift math):
+ *     `start`  — wall-clock moment of first kickoff
+ *     `finish` — wall-clock moment the timer left active (transition point)
+ *     `plannedStart` / `plannedFinish` / `plannedDuration` — snapshots of the
+ *       timer's planned values at first kickoff, used as the drift baseline
+ *       so live edits to duration don't silently shift the zero point
+ *
+ *   Resume layer (countdown state):
+ *     `elapsed` — total countdown time consumed, excluding pauses. When the
+ *       user jumps back to a previously-run timer, this is where the
+ *       countdown resumes from. NOT equal to `finish - start` when the timer
+ *       was paused during its run.
+ *
+ * `createTimestamps` reads `start`/`finish` (+ planned snapshots) for the
+ * schedule layer. `elapsed` is for the caller's resume logic — don't derive
+ * `actual.duration` from it; use `finish - start` to keep wall-clock identity.
+ */
 export interface MemoryTimerEntry {
   start: number | null
   finish: number | null
@@ -136,7 +156,12 @@ export interface Timestamp {
   /** Scheduled times from current timer config. */
   planned: { start: number, finish: number, duration: number }
 
-  /** Realised times: memory for PAST, kickoff+live for ACTIVE, projected for FUTURE. */
+  /**
+   * Realised times: memory for PAST, kickoff+live for ACTIVE, projected for
+   * FUTURE. All wall-clock — `duration === finish - start` holds for every row.
+   * For countdown time consumed (excluding pauses) on PAST timers, read
+   * `memory.elapsed` directly; it's a different concept.
+   */
   actual: { start: number, finish: number, duration: number }
 
   /** `actual.start - planned.start`. Drift entering the timer. Baseline pinned to memory snapshot when present. */
