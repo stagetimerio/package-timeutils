@@ -76,8 +76,8 @@ describe('createTimestamps', () => {
         expect(t.state).toBe('FUTURE')
         expect(t.actual.start).toBe(t.planned.start)
         expect(t.actual.finish).toBe(t.planned.finish)
-        expect(t.drift).toBe(0)
-        expect(t.overUnder).toBe(0)
+        expect(t.startDrift).toBe(0)
+        expect(t.finishDrift).toBe(0)
         expect(t.hasMemory).toBe(false)
       }
     })
@@ -132,8 +132,8 @@ describe('createTimestamps', () => {
       expect(ts[0].actual.start).toBe(THREE_PM + min(5))
       expect(ts[0].actual.duration).toBe(min(10))
       expect(ts[0].actual.finish).toBe(THREE_PM + min(15))
-      expect(ts[0].drift).toBe(min(5))
-      expect(ts[0].overUnder).toBe(min(5))
+      expect(ts[0].startDrift).toBe(min(5))
+      expect(ts[0].finishDrift).toBe(min(5))
     })
 
     it('DURATION overrunning: actual.finish = now', () => {
@@ -144,7 +144,7 @@ describe('createTimestamps', () => {
       const now = THREE_PM + min(12) // 2min overrun
       const ts = createTimestamps(timers, timeset, undefined, now)
       expect(ts[0].actual.finish).toBe(now)
-      expect(ts[0].overUnder).toBe(min(2))
+      expect(ts[0].finishDrift).toBe(min(2))
     })
 
     it('FUTURE timer after ACTIVE: drift chains through', () => {
@@ -159,7 +159,7 @@ describe('createTimestamps', () => {
       // t2 actual.start (non-linked) = max(prev.actual.finish=15, planned.start=10) = 15
       expect(ts[1].planned.start).toBe(THREE_PM + min(10))
       expect(ts[1].actual.start).toBe(THREE_PM + min(15))
-      expect(ts[1].drift).toBe(min(5))
+      expect(ts[1].startDrift).toBe(min(5))
     })
 
     it('FUTURE timer after ACTIVE with gap: gap absorbs part of drift', () => {
@@ -174,7 +174,7 @@ describe('createTimestamps', () => {
       // t2 planned.start = THREE_PM + 15. actual.start = max(18, 15) = 18
       // drift = 18 - 15 = 3min (gap of 5min absorbed 5 of 8 min drift)
       expect(ts[1].actual.start).toBe(THREE_PM + min(18))
-      expect(ts[1].drift).toBe(min(3))
+      expect(ts[1].startDrift).toBe(min(3))
     })
 
     it('LINKED timer: drift passes through without gap absorption', () => {
@@ -193,7 +193,7 @@ describe('createTimestamps', () => {
       expect(ts[1].planned.start).toBe(THREE_PM + min(15))
       expect(ts[1].actual.start).toBe(THREE_PM + min(13))
       // Drift: actual.start (3PM+13) - planned.start (3PM+15) = -2min (ahead of schedule!)
-      expect(ts[1].drift).toBe(-min(2))
+      expect(ts[1].startDrift).toBe(-min(2))
     })
   })
 
@@ -213,7 +213,7 @@ describe('createTimestamps', () => {
       expect(ts[1].actual.start).toBe(THREE_PM + min(20))
       expect(ts[1].actual.finish).toBe(THREE_PM + min(25))
       expect(ts[1].actual.duration).toBe(min(5))
-      expect(ts[1].overUnder).toBe(0) // finish didn't shift
+      expect(ts[1].finishDrift).toBe(0) // finish didn't shift
     })
 
     it('FUTURE FINISH_TIME clamps when drift exceeds duration', () => {
@@ -231,7 +231,7 @@ describe('createTimestamps', () => {
       expect(ts[1].actual.start).toBe(THREE_PM + min(20))
       expect(ts[1].actual.finish).toBe(THREE_PM + min(20))
       expect(ts[1].actual.duration).toBe(0)
-      expect(ts[1].overUnder).toBe(min(5)) // overflow drift propagates
+      expect(ts[1].finishDrift).toBe(min(5)) // overflow drift propagates
     })
   })
 
@@ -254,7 +254,7 @@ describe('createTimestamps', () => {
       expect(ts[0].actual.start).toBe(THREE_PM + min(2))
       expect(ts[0].actual.finish).toBe(THREE_PM + min(12))
       expect(ts[0].actual.duration).toBe(min(10))
-      expect(ts[0].drift).toBe(min(2))
+      expect(ts[0].startDrift).toBe(min(2))
     })
 
     it('skipped PAST (positionally past, no memory) chains from prev, drift = 0', () => {
@@ -274,14 +274,14 @@ describe('createTimestamps', () => {
       expect(ts[0].hasMemory).toBe(false)
       expect(ts[1].state).toBe('PAST')
       expect(ts[1].hasMemory).toBe(false)
-      expect(ts[0].drift).toBe(0)
-      expect(ts[1].drift).toBe(0)
+      expect(ts[0].startDrift).toBe(0)
+      expect(ts[1].startDrift).toBe(0)
       expect(ts[2].state).toBe('ACTIVE')
     })
 
-    it('skipped timer has zero actual duration, recovers overUnder', () => {
+    it('skipped timer has zero actual duration, recovers finishDrift', () => {
       // Scenario: A ran long (+8min over), B skipped to recover time, C now active.
-      // Expect B.actual.duration == 0, B.drift == +8min (inherited), B.overUnder == -2min.
+      // Expect B.actual.duration == 0, B.startDrift == +8min (inherited), B.finishDrift == -2min.
       timers[0].startTime = new Date(THREE_PM)
       timeset.timerId = '3'
       timeset.running = true
@@ -297,16 +297,16 @@ describe('createTimestamps', () => {
       // A — PAST with memory, ran 8 min over
       expect(ts[0].state).toBe('PAST')
       expect(ts[0].hasMemory).toBe(true)
-      expect(ts[0].overUnder).toBe(min(8))
+      expect(ts[0].finishDrift).toBe(min(8))
 
-      // B — skipped: zero duration, drift inherited, overUnder recovers
+      // B — skipped: zero duration, startDrift inherited, finishDrift recovers
       expect(ts[1].state).toBe('PAST')
       expect(ts[1].hasMemory).toBe(false)
       expect(ts[1].actual.start).toBe(THREE_PM + min(18))
       expect(ts[1].actual.finish).toBe(THREE_PM + min(18))
       expect(ts[1].actual.duration).toBe(0)
-      expect(ts[1].drift).toBe(min(8))       // propagated from A
-      expect(ts[1].overUnder).toBe(-min(2))  // 3:18 − 3:20 = recovered 10 min of 8 over
+      expect(ts[1].startDrift).toBe(min(8))       // propagated from A
+      expect(ts[1].finishDrift).toBe(-min(2))  // 3:18 − 3:20 = recovered 10 min of 8 over
 
       // C — active
       expect(ts[2].state).toBe('ACTIVE')
@@ -365,9 +365,9 @@ describe('createTimestamps', () => {
       }
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(14), null, memory)
       // Drift should use snapshot (THREE_PM), not current planned (which is still THREE_PM since startTime didn't change)
-      expect(ts[0].drift).toBe(min(2))
-      // overUnder from snapshot: actual.finish (3PM+13) - snapshot.plannedFinish (3PM+10) = 3min
-      expect(ts[0].overUnder).toBe(min(3))
+      expect(ts[0].startDrift).toBe(min(2))
+      // finishDrift from snapshot: actual.finish (3PM+13) - snapshot.plannedFinish (3PM+10) = 3min
+      expect(ts[0].finishDrift).toBe(min(3))
     })
   })
 
@@ -389,9 +389,9 @@ describe('createTimestamps', () => {
       // t1 started before reset (2 < 15) → zero-drift: actual = planned
       expect(ts[0].actual.start).toBe(ts[0].planned.start)
       expect(ts[0].actual.finish).toBe(ts[0].planned.finish)
-      expect(ts[0].drift).toBe(0)
+      expect(ts[0].startDrift).toBe(0)
       // t2 started after reset (14 < 15 → still before) → also zero-drift
-      expect(ts[1].drift).toBe(0)
+      expect(ts[1].startDrift).toBe(0)
     })
 
     it('memory entries after reset keep their drift', () => {
@@ -408,8 +408,8 @@ describe('createTimestamps', () => {
         },
       }
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(16), null, memory)
-      expect(ts[0].drift).toBe(0) // zeroed
-      expect(ts[1].drift).toBe(min(3)) // 13 - 10 = 3
+      expect(ts[0].startDrift).toBe(0) // zeroed
+      expect(ts[1].startDrift).toBe(min(3)) // 13 - 10 = 3
     })
   })
 
@@ -451,7 +451,7 @@ describe('createTimestamps', () => {
       expect(ts[2].state).toBe('PAST')
       expect(ts[0].actual.duration).toBe(min(10))
       expect(ts[1].actual.duration).toBe(min(12))
-      expect(ts[1].overUnder).toBe(min(2)) // ran 2 min over plan
+      expect(ts[1].finishDrift).toBe(min(2)) // ran 2 min over plan
     })
   })
 
@@ -468,8 +468,8 @@ describe('createTimestamps', () => {
         expect(t).toHaveProperty('actual.start')
         expect(t).toHaveProperty('actual.finish')
         expect(t).toHaveProperty('actual.duration')
-        expect(t).toHaveProperty('drift')
-        expect(t).toHaveProperty('overUnder')
+        expect(t).toHaveProperty('startDrift')
+        expect(t).toHaveProperty('finishDrift')
         expect(t).toHaveProperty('gap')
         expect(t).toHaveProperty('hasMemory')
         expect(t).toHaveProperty('explicitStart')

@@ -25,9 +25,9 @@ const TIMER_TRIGGERS = {
   SCHEDULED: 'SCHEDULED' as const,
 }
 
-// Quantise drift/overUnder to this grain (truncated toward zero, see roundDrift).
-// Keeps values stable across `now` ticks so fastDeepEqual can short-circuit;
-// sub-threshold drift reads as 0.
+// Quantise startDrift/finishDrift to this grain (truncated toward zero, see
+// roundDrift). Keeps values stable across `now` ticks so fastDeepEqual can
+// short-circuit; sub-threshold drift reads as 0.
 const DRIFT_ROUND_MS = 500
 
 // --- Helpers -------------------------------------------------------------
@@ -93,9 +93,9 @@ function roundDrift (ms: number): number {
  *   - `hasMemory` → recorded values from the memory entry
  *   - otherwise → projection from prev.actual.finish
  *
- * `drift` and `overUnder` emerge as the difference between the two chains.
- * `state` is a purely positional label for consumers; it does not steer the
- * actual-chain computation.
+ * `startDrift` and `finishDrift` emerge as the difference between the two
+ * chains at each endpoint. `state` is a purely positional label for
+ * consumers; it does not steer the actual-chain computation.
  */
 export function createTimestamps (
   timers: TimerInput[],
@@ -244,7 +244,7 @@ export function createTimestamps (
 
       if (state === 'PAST') {
         // Skipped: user advanced past this timer without running it.
-        // Collapse to zero duration so recovered time reduces overUnder.
+        // Collapse to zero duration so recovered time reduces finishDrift.
         actualFinish = actualStart
         actualDuration = 0
       } else if (timer.type === TIMER_TYPES.FINISH_TIME) {
@@ -262,8 +262,8 @@ export function createTimestamps (
     // 4. Emergent values
     // ---------------------------------------------------------------------
 
-    const drift = roundDrift(actualStart - driftBaselineStart)
-    const overUnder = roundDrift(actualFinish - driftBaselineFinish)
+    const startDrift = roundDrift(actualStart - driftBaselineStart)
+    const finishDrift = roundDrift(actualFinish - driftBaselineFinish)
     const gap = prevPlannedFinish ? plannedStart - prevPlannedFinish : 0
 
     out.push({
@@ -271,8 +271,8 @@ export function createTimestamps (
       state,
       planned,
       actual,
-      drift,
-      overUnder,
+      startDrift,
+      finishDrift,
       gap,
       hasMemory,
       explicitStart,

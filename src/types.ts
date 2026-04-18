@@ -107,19 +107,24 @@ export interface MemoryInput {
 /**
  * Per-timer output of `createTimestamps`. All time fields are epoch ms.
  *
- * `planned` and `actual` are two independent chains. `drift` (entering delta)
- * and `overUnder` (exiting delta) emerge between them, both quantised to
- * 500ms and bidirectional (negative = ahead of schedule).
+ * `planned` and `actual` are two independent chains. `startDrift` and
+ * `finishDrift` are the schedule delta measured at the two endpoints of the
+ * same timer — drift entering and drift exiting. Both quantised to 500ms and
+ * bidirectional (negative = ahead of schedule).
  *
  * Event-level totals read from the endpoints — the actual chain already
  * carries accumulated deviation forward, so summing would double-count:
  *   eventActualFinish = last.actual.finish
- *   eventOverUnder    = last.overUnder
+ *   eventFinishDrift  = last.finishDrift
  *
- * On back-to-back chains `drift[i+1] === overUnder[i]`; a scheduled gap or a
- * previous under-run resets drift to 0 at the boundary (unless LINKED).
- * FINISH_TIME anchors absorb drift into their duration and clamp `overUnder`
- * to 0 until drift exceeds the slot.
+ * On back-to-back chains `startDrift[i+1] === finishDrift[i]`; a scheduled gap
+ * or a previous under-run resets startDrift to 0 at the boundary (unless
+ * LINKED). FINISH_TIME anchors absorb drift into their duration and clamp
+ * `finishDrift` to 0 until drift exceeds the slot.
+ *
+ * The timer's own variance (over- or under-run vs its planned duration) is
+ * `finishDrift - startDrift`, which equals `actual.duration - planned.duration`.
+ * Not exposed as a field — compute at call sites if needed.
  */
 export interface Timestamp {
   /** Timer's `_id`, passed through from input. */
@@ -134,11 +139,11 @@ export interface Timestamp {
   /** Realised times: memory for PAST, kickoff+live for ACTIVE, projected for FUTURE. */
   actual: { start: number, finish: number, duration: number }
 
-  /** `actual.start - planned.start`. Baseline pinned to memory snapshot when present. */
-  drift: number
+  /** `actual.start - planned.start`. Drift entering the timer. Baseline pinned to memory snapshot when present. */
+  startDrift: number
 
-  /** `actual.finish - planned.finish`. Grows live on the ACTIVE timer past its end. */
-  overUnder: number
+  /** `actual.finish - planned.finish`. Drift exiting the timer. Grows live on the ACTIVE timer past its end. */
+  finishDrift: number
 
   /** Planned gap before this timer (`planned.start - prev.planned.finish`). 0 for the first. */
   gap: number
