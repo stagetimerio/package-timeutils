@@ -1,4 +1,4 @@
-const abbreviations = {
+export const abbreviations = {
   'Acre Time': 'ACT',
   'Afghanistan Time': 'AFT',
   'Alaska Daylight Time': 'AKDT',
@@ -272,4 +272,3 @@ const abbreviations = {
   'Zulu Time Zone': 'Z',
 } as const
 
-export default abbreviations

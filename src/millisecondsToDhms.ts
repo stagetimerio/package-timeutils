@@ -1,6 +1,6 @@
 import type { DHMS } from './types'
 
-export default function millisecondsToDhms (
+export function millisecondsToDhms (
   ms = 0,
   { ceil = true }: { ceil?: boolean } = {},
 ): DHMS {

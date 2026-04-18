@@ -1,5 +1,5 @@
-import isValidDate from './isValidDate'
-import parseDate from './parseDate'
+import { isValidDate } from './isValidDate'
+import { parseDate } from './parseDate'
 import { addMilliseconds } from 'date-fns/addMilliseconds'
 import { getTimezoneOffset } from './getTimezoneOffset'
 

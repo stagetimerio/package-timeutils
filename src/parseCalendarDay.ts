@@ -1,5 +1,5 @@
 import { getTimezoneOffset } from './getTimezoneOffset'
-import getToday from './getToday'
+import { getToday } from './getToday'
 
 const CALENDAR_DAY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/
 
@@ -50,7 +50,7 @@ export interface ParseCalendarDayOptions {
  * @returns A `Date` at 00:00:00.000 local time on the resolved day.
  * @throws {RangeError} if `day` is a non-null string that doesn't match `YYYY-MM-DD`.
  */
-export default function parseCalendarDay (
+export function parseCalendarDay (
   day: string | null,
   {
     datePlus = 0,

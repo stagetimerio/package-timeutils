@@ -3,7 +3,7 @@ import { parseISO } from 'date-fns/parseISO'
 import { getTimezoneOffset } from './getTimezoneOffset'
 import { addMinutes } from 'date-fns/addMinutes'
 import { addMilliseconds } from 'date-fns/addMilliseconds'
-import isValidDate from './isValidDate'
+import { isValidDate } from './isValidDate'
 
 /**
  * Parses a given input into a date object, handling different date formats and timezones.
@@ -24,7 +24,7 @@ import isValidDate from './isValidDate'
  * // Parsing a full datetime string
  * parseDate('2023-01-01T12:00:00')
  */
-export default function parseDate (
+export function parseDate (
   rawInput: unknown,
   tz: string | undefined = undefined,
 ): Date | null {

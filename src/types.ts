@@ -50,3 +50,105 @@ export type TenthsDisplay = 'always'
 export type DurationFormat = string
 
 export type ZeroDisplay = 'always' | 'nonzero' | 'never'
+
+// --- createTimestamps ----------------------------------------------------
+
+export type TimerType = 'DURATION' | 'FINISH_TIME' | 'TIME_WARP'
+export type TimerTrigger = 'MANUAL' | 'LINKED' | 'SCHEDULED'
+
+/**
+ * Purely positional, relative to the active timer in the list:
+ *   - `ACTIVE` — `timeset.timerId` matches this timer
+ *   - `PAST`   — index is before the active timer
+ *   - `FUTURE` — index is after the active timer
+ *
+ * Fallback when no timer is active: `PAST` iff the timer has memory, else
+ * `FUTURE`. Memory presence is carried separately by `hasMemory`, so a PAST
+ * timer without memory (skipped) and a FUTURE timer with memory (jumped
+ * back from) are both valid and meaningful.
+ */
+export type TimestampState = 'PAST' | 'ACTIVE' | 'FUTURE'
+
+export interface TimerInput {
+  _id: string | number
+  type: TimerType
+  trigger: TimerTrigger
+  hours?: number
+  minutes?: number
+  seconds?: number
+  startTime?: string | Date | null
+  startDatePlus?: number
+  finishTime?: string | Date | null
+  finishDatePlus?: number
+}
+
+export interface TimesetInput {
+  timerId: string | number | null
+  running: boolean
+  kickoff: number | Date | null
+  lastStop: number | Date | null
+  deadline?: number | Date | null
+}
+
+export interface MemoryTimerEntry {
+  start: number | null
+  finish: number | null
+  elapsed: number
+  plannedStart?: number | null
+  plannedFinish?: number | null
+  plannedDuration?: number | null
+}
+
+export interface MemoryInput {
+  driftResetAt?: number | null
+  timers?: Record<string, MemoryTimerEntry>
+}
+
+/**
+ * Per-timer output of `createTimestamps`. All time fields are epoch ms.
+ *
+ * `planned` and `actual` are two independent chains. `drift` (entering delta)
+ * and `overUnder` (exiting delta) emerge between them, both quantised to
+ * 500ms and bidirectional (negative = ahead of schedule).
+ *
+ * Event-level totals read from the endpoints — the actual chain already
+ * carries accumulated deviation forward, so summing would double-count:
+ *   eventActualFinish = last.actual.finish
+ *   eventOverUnder    = last.overUnder
+ *
+ * On back-to-back chains `drift[i+1] === overUnder[i]`; a scheduled gap or a
+ * previous under-run resets drift to 0 at the boundary (unless LINKED).
+ * FINISH_TIME anchors absorb drift into their duration and clamp `overUnder`
+ * to 0 until drift exceeds the slot.
+ */
+export interface Timestamp {
+  /** Timer's `_id`, passed through from input. */
+  timerId: string | number
+
+  /** Positional label (see `TimestampState`). Orthogonal to `hasMemory`. */
+  state: TimestampState
+
+  /** Scheduled times from current timer config. */
+  planned: { start: number, finish: number, duration: number }
+
+  /** Realised times: memory for PAST, kickoff+live for ACTIVE, projected for FUTURE. */
+  actual: { start: number, finish: number, duration: number }
+
+  /** `actual.start - planned.start`. Baseline pinned to memory snapshot when present. */
+  drift: number
+
+  /** `actual.finish - planned.finish`. Grows live on the ACTIVE timer past its end. */
+  overUnder: number
+
+  /** Planned gap before this timer (`planned.start - prev.planned.finish`). 0 for the first. */
+  gap: number
+
+  /** Timer has a real memory entry (`finish != null`). Orthogonal to `state`. */
+  hasMemory: boolean
+
+  /** Timer has a `startTime` anchor — render separately, and a preceding `gap` is a scheduled pause. */
+  explicitStart: boolean
+
+  /** Timer is `FINISH_TIME` — wall-clock anchored finish, drift-absorbing. */
+  explicitFinish: boolean
+}

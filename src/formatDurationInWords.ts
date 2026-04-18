@@ -1,5 +1,5 @@
 import { formatDistance } from 'date-fns/formatDistance'
-import millisecondsToDhms from './millisecondsToDhms'
+import { millisecondsToDhms } from './millisecondsToDhms'
 
 function singularPlural (n: number, singular: string, plural: string, space: string): string {
   const quantity = n === -1 ? 'Unlimited' : n

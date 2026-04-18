@@ -1,6 +1,6 @@
-import parseDate from './parseDate'
+import { parseDate } from './parseDate'
 import { applyDate } from './applyDate'
-import getToday from './getToday'
+import { getToday } from './getToday'
 import { addDays } from 'date-fns/addDays'
 
 /**
@@ -23,7 +23,7 @@ import { addDays } from 'date-fns/addDays'
  *
  * @throws {Error} - Throws an error if 'after' or 'now' options are provided but are not valid Date instances.
  */
-export default function parseDateAsToday (
+export function parseDateAsToday (
   rawInput: Date | string,
   {
     timezone = undefined,

@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import createTimestamps, {
-  type TimerInput,
-  type TimesetInput,
-  type MemoryInput,
-} from '../src/createTimestamps'
+import { createTimestamps } from '../src/createTimestamps'
+import type { TimerInput, TimesetInput, MemoryInput } from '../src/types'
 import { addMinutes } from 'date-fns/addMinutes'
-import parseDateAsToday from '../src/parseDateAsToday'
+import { parseDateAsToday } from '../src/parseDateAsToday'
 
 const THREE_PM = parseDateAsToday('2022-01-01T15:00:00.000Z').getTime()
 const min = (n: number) => n * 60_000

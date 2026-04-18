@@ -1,4 +1,4 @@
-import millisecondsToDhms from './millisecondsToDhms'
+import { millisecondsToDhms } from './millisecondsToDhms'
 import { dhmsToDigits } from './dhmsToDigits'
 import type { DurationFormat, ZeroDisplay } from './types'
 

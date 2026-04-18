@@ -1,4 +1,4 @@
-import abbreviations from './abbreviations'
+import { abbreviations } from './abbreviations'
 
 type FormatOption = 'city' | 'long' | 'abbr' | 'offset'
 
@@ -17,7 +17,7 @@ type FormatOption = 'city' | 'long' | 'abbr' | 'offset'
  * @param {Date} date - The reference date used to determine the 'long', 'abbr' and 'offset'
  * @return {string} The formatted timezone string.
  */
-export default function formatTimezone (
+export function formatTimezone (
   timezone: string,
   format: FormatOption | FormatOption[] = 'long',
   date: Date = new Date(),
