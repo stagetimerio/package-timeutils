@@ -434,6 +434,69 @@ describe('createTimestamps', () => {
       expect(ts[0].startDrift).toBe(0) // zeroed
       expect(ts[1].startDrift).toBe(min(3)) // 13 - 10 = 3
     })
+
+    it('reset during active timer: startDrift & finishDrift zero at reset moment', () => {
+      // Event running +8 min late. Timer A planned 3:00–3:10, kicked off late
+      // at 3:08. At 3:20 user hits reset. `now` = 3:20.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(8)
+      const memory: MemoryInput = {
+        driftResetAt: THREE_PM + min(20),
+        timers: {
+          '1': { start: THREE_PM + min(8), finish: null, elapsed: 0 },
+        },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(20), null, memory)
+      expect(ts[0].state).toBe('ACTIVE')
+      expect(ts[0].actual.start).toBe(THREE_PM + min(20)) // floored to reset
+      expect(ts[0].actual.finish).toBe(THREE_PM + min(30)) // reset + 10min duration
+      expect(ts[0].startDrift).toBe(0)
+      expect(ts[0].finishDrift).toBe(0)
+      // Future timer B (planned 3:10–3:20) chains clean from active
+      expect(ts[1].state).toBe('FUTURE')
+      expect(ts[1].actual.start).toBe(THREE_PM + min(30))
+      expect(ts[1].startDrift).toBe(0)
+      expect(ts[1].finishDrift).toBe(0)
+    })
+
+    it('reset during active timer: drift accumulates again after reset', () => {
+      // Same setup, but `now` is 5 min past reset — active timer now overrunning.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(8)
+      const memory: MemoryInput = {
+        driftResetAt: THREE_PM + min(20),
+        timers: {
+          '1': { start: THREE_PM + min(8), finish: null, elapsed: 0 },
+        },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(35), null, memory)
+      // Active: actual start still reset (3:20), finish grows past scheduled
+      expect(ts[0].actual.start).toBe(THREE_PM + min(20))
+      expect(ts[0].actual.finish).toBe(THREE_PM + min(35)) // now > reset + 10
+      expect(ts[0].startDrift).toBe(0) // still zero — it "started" at reset
+      expect(ts[0].finishDrift).toBe(min(5)) // 5 min over the new slot
+    })
+
+    it('reset with no active timer: future row with plannedStart < reset floors forward', () => {
+      // Edge case: reset pressed with no timer active (e.g. during a gap).
+      // First future timer had a planned start before the reset — its baseline
+      // should floor at reset, and it starts "now" from the reset moment.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = null
+      const memory: MemoryInput = {
+        driftResetAt: THREE_PM + min(20),
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(20), null, memory)
+      expect(ts[0].state).toBe('FUTURE')
+      expect(ts[0].actual.start).toBe(THREE_PM + min(20))
+      expect(ts[0].actual.finish).toBe(THREE_PM + min(30))
+      expect(ts[0].startDrift).toBe(0)
+      expect(ts[0].finishDrift).toBe(0)
+    })
   })
 
   describe('timezone + roomDate handling', () => {

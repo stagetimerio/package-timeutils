@@ -125,6 +125,12 @@ export function createTimestamps (
   let prevActualFinish: number = 0
   let prevActualExists = false
 
+  // Drift baseline chain — tracks the floored baseline finish of the previous
+  // row so a reset-induced shift cascades through the active + future chain.
+  // Without this, every row would floor only at the reset moment and a prev
+  // timer's shifted slot would appear as drift on the next timer.
+  let prevDriftBaselineFinish: number = 0
+
   const out: Timestamp[] = []
 
   for (let i = 0; i < timers.length; i++) {
@@ -184,13 +190,26 @@ export function createTimestamps (
     const planned = { start: plannedStart, finish: plannedFinish, duration: plannedDuration }
 
     // ---------------------------------------------------------------------
-    // 2. Drift baseline (use snapshot if present)
+    // 2. Drift baseline (use snapshot if present, apply reset floor)
     // ---------------------------------------------------------------------
 
     const snapStart = memoryEntry?.plannedStart ?? null
     const snapFinish = memoryEntry?.plannedFinish ?? null
-    const driftBaselineStart = snapStart !== null ? snapStart : plannedStart
-    const driftBaselineFinish = snapFinish !== null ? snapFinish : plannedFinish
+    const rawBaselineStart = snapStart !== null ? snapStart : plannedStart
+    const rawBaselineFinish = snapFinish !== null ? snapFinish : plannedFinish
+
+    // `driftResetAt` acts as a floor on the drift baseline for the active
+    // timer and future rows — their zero-point shifts forward to the reset
+    // moment, so `startDrift` and `finishDrift` both read 0 at reset. Past
+    // rows with memory keep the raw baseline; they already drift-to-zero by
+    // snapping `actual` to the baseline (both sides move together).
+    const applyFloor = driftResetAt != null && (isActive || state === 'FUTURE')
+    const driftBaselineStart = applyFloor
+      ? Math.max(rawBaselineStart, driftResetAt!, prevDriftBaselineFinish)
+      : rawBaselineStart
+    const driftBaselineFinish = timer.type === TIMER_TYPES.FINISH_TIME
+      ? Math.max(rawBaselineFinish, driftBaselineStart)
+      : driftBaselineStart + (rawBaselineFinish - rawBaselineStart)
 
     // ---------------------------------------------------------------------
     // 3. Actual chain
@@ -209,25 +228,27 @@ export function createTimestamps (
     //     the timer has not yet played in the current pass), and skipped
     //     PAST-no-mem (zero-duration, see below).
     if (isActive) {
-      actualStart = kickoffMs ?? plannedStart
+      const rawActualStart = kickoffMs ?? plannedStart
+      // Floor: reset pressed while this timer was active → treat the reset
+      // moment (or the cascaded baseline from prev) as the effective start.
+      actualStart = applyFloor ? Math.max(rawActualStart, driftBaselineStart) : rawActualStart
       if (timer.type === TIMER_TYPES.FINISH_TIME) {
-        const baseFinish = Math.max(plannedFinish, actualStart)
-        actualFinish = Math.max(baseFinish, now)
-        actualDuration = Math.max(0, actualFinish - actualStart)
+        actualFinish = Math.max(driftBaselineFinish, actualStart, now)
       } else {
-        const scheduled = actualStart + plannedDuration
-        actualFinish = Math.max(scheduled, now)
-        actualDuration = Math.max(0, actualFinish - actualStart)
+        actualFinish = Math.max(actualStart + plannedDuration, now)
       }
+      actualDuration = Math.max(0, actualFinish - actualStart)
     } else if (state === 'PAST' && hasMemory) {
       const memStart = memoryEntry!.start ?? memoryEntry!.finish! - (memoryEntry!.elapsed ?? 0)
       const memFinish = memoryEntry!.finish!
       const beforeReset = driftResetAt != null && memStart < driftResetAt
       if (beforeReset) {
-        // Drift reset erases any drift before the reset point
-        actualStart = driftBaselineStart
-        actualFinish = driftBaselineFinish
-        actualDuration = driftBaselineFinish - driftBaselineStart
+        // Drift reset erases any drift before the reset point. Uses the
+        // raw baseline (not the floored one) so actual rewrites don't jump
+        // forward in time — past rows stay at their original planned slot.
+        actualStart = rawBaselineStart
+        actualFinish = rawBaselineFinish
+        actualDuration = rawBaselineFinish - rawBaselineStart
       } else {
         // `actual.duration` is wall-clock (finish - start) to keep the
         // identity `actual.finish - actual.start === actual.duration` consistent
@@ -245,6 +266,10 @@ export function createTimestamps (
         actualStart = Math.max(prevActualFinish, plannedStart)
       } else {
         actualStart = plannedStart
+      }
+      // Floor FUTURE rows at the cascaded baseline so the chain zeros cleanly.
+      if (applyFloor) {
+        actualStart = Math.max(actualStart, driftBaselineStart)
       }
 
       if (state === 'PAST') {
@@ -287,6 +312,7 @@ export function createTimestamps (
     prevPlannedFinish = plannedFinish
     prevActualFinish = actualFinish
     prevActualExists = true
+    prevDriftBaselineFinish = driftBaselineFinish
   }
 
   return out
