@@ -1,0 +1,110 @@
+[
+  {
+    "chime": {
+      "yellow": "NONE",
+      "red": "NONE",
+      "zero": "NONE"
+    },
+    "flash": {
+      "yellow": 1,
+      "red": 1,
+      "zero": 0
+    },
+    "_id": "641a30d008db4d99fbcd5976",
+    "index": 25,
+    "name": "Saturday, 10:09:24 - 10:14:39 AM",
+    "extra": "Wait Wait...Don't Tell Me",
+    "notes": "",
+    "showName": true,
+    "showExtra": true,
+    "showNotes": true,
+    "appearance": "COUNTDOWN",
+    "type": "FINISH_TIME",
+    "hours": 0,
+    "minutes": 2,
+    "seconds": 0,
+    "yellow": 60000,
+    "red": 10000,
+    "trigger": "LINKED",
+    "startTime": "2023-03-25T16:09:24.000Z",
+    "startDate": true,
+    "finishTime": "2023-03-25T16:14:39.000Z",
+    "finishDate": true,
+    "createdAt": "2023-03-21T22:33:52.939Z",
+    "updatedAt": "2023-03-25T04:05:10.004Z",
+    "__v": 0,
+    "id": "641a30d008db4d99fbcd5976"
+  },
+  {
+    "chime": {
+      "yellow": "NONE",
+      "red": "NONE",
+      "zero": "NONE"
+    },
+    "flash": {
+      "yellow": 0,
+      "red": 0,
+      "zero": 0
+    },
+    "_id": "641a317708db4d99fbcd5f72",
+    "index": 26,
+    "name": "Next break starts in:",
+    "extra": "at 10:24:09 AM",
+    "notes": "",
+    "showName": true,
+    "showExtra": true,
+    "showNotes": true,
+    "appearance": "COUNTDOWN",
+    "type": "FINISH_TIME",
+    "hours": 21,
+    "minutes": 19,
+    "seconds": 0,
+    "yellow": 0,
+    "red": 0,
+    "trigger": "LINKED",
+    "startTime": null,
+    "startDate": false,
+    "finishTime": "2023-03-25T16:24:09.000Z",
+    "finishDate": true,
+    "createdAt": "2023-03-21T22:36:39.604Z",
+    "updatedAt": "2023-03-25T02:20:41.073Z",
+    "__v": 0,
+    "id": "641a317708db4d99fbcd5f72"
+  },
+  {
+    "chime": {
+      "yellow": "NONE",
+      "red": "NONE",
+      "zero": "NONE"
+    },
+    "flash": {
+      "yellow": 1,
+      "red": 1,
+      "zero": 0
+    },
+    "_id": "641a31c508db4d99fbcd63b6",
+    "index": 27,
+    "name": "Saturday, 10:24:09 - 10:29:24 AM",
+    "extra": "Wait Wait...Don't Tell Me",
+    "notes": "",
+    "showName": true,
+    "showExtra": true,
+    "showNotes": true,
+    "appearance": "COUNTDOWN",
+    "type": "FINISH_TIME",
+    "hours": 0,
+    "minutes": 2,
+    "seconds": 0,
+    "yellow": 60000,
+    "red": 10000,
+    "trigger": "LINKED",
+    "startTime": "2023-03-25T16:24:09.000Z",
+    "startDate": true,
+    "finishTime": "2023-03-25T16:29:24.000Z",
+    "finishDate": true,
+    "createdAt": "2023-03-21T22:37:57.435Z",
+    "updatedAt": "2023-03-25T04:05:59.918Z",
+    "__v": 0,
+    "id": "641a31c508db4d99fbcd63b6"
+  }
+]

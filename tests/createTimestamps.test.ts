@@ -3,6 +3,8 @@ import { createTimestamps } from '../src/createTimestamps'
 import type { TimerInput, TimesetInput, MemoryInput } from '../src/types'
 import { addMinutes } from 'date-fns/addMinutes'
 import { parseDateAsToday } from '../src/parseDateAsToday'
+import timestampsFixture1 from './fixtures/timestamps-1-in.json' with { type: 'json' }
+import timestampsFixture2 from './fixtures/timestamps-2-in.json' with { type: 'json' }
 
 const THREE_PM = parseDateAsToday('2022-01-01T15:00:00.000Z').getTime()
 const min = (n: number) => n * 60_000
@@ -538,6 +540,108 @@ describe('createTimestamps', () => {
       expect(ts[0].actual.duration).toBe(min(10))
       expect(ts[1].actual.duration).toBe(min(12))
       expect(ts[1].finishDrift).toBe(min(2)) // ran 2 min over plan
+    })
+  })
+
+  // Regression tests ported from the legacy client-side createTimestamps suite.
+  // Each captures a real production bug in date-boundary handling. The new impl
+  // uses the same `parseDateAsToday` / `applyDate` primitives, so these bugs
+  // remain reachable and must stay tested.
+  describe('regression: date-boundary bugs', () => {
+    // Monticello bug: FINISH_TIME with a past startTime + no finishDatePlus →
+    // parseDateAsToday(finishTime) used to anchor finish to "today" instead of
+    // the startTime's day, producing a huge (days-long) planned.duration.
+    // Fix: pass `start` as the `now` reference when parsing finishTime.
+    it('FINISH_TIME: finish anchors to start day, not "today" (Monticello bug)', () => {
+      timers[0].type = 'FINISH_TIME'
+      timers[0].startTime = '2025-05-21T08:00:00.000Z'
+      timers[0].finishTime = '2025-05-21T08:10:00.000Z'
+      // `now` chosen well after the configured date — the bug surfaced when
+      // "today" diverged from the startTime's day.
+      const later = new Date('2025-07-01T12:00:00.000Z').getTime()
+      const ts = createTimestamps(timers, timeset, 'UTC', later)
+      // Essence: finish is 10 min after start, on the same day. No 24h drift.
+      expect(ts[0].planned.duration).toBe(10 * 60_000)
+    })
+
+    // Michael Havey bug #1: a multi-timer chain where timestamp.finish on the
+    // LINKED middle row got shifted by ±24h (a DST-aware off-by-one). Fix:
+    // applyDate received timer.finishTime's date, not timer.finishDate.
+    // In the new architecture the one-shot `resolveAnchoredTime` helper
+    // collapses the bug's code path, but the regression is cheap to preserve.
+    it('Michael Havey bug #1: LINKED chain with roomDate does not produce 24h gap', () => {
+      const timers = timestampsFixture1 as unknown as TimerInput[]
+      const active = timers[1]!
+      const ts = createTimestamps(
+        timers,
+        makeTimeset({
+          timerId: active._id,
+          kickoff: new Date(active.startTime as string),
+          lastStop: new Date(active.startTime as string),
+          deadline: new Date(active.finishTime as string),
+          running: true,
+        }),
+        'UTC',
+        new Date(active.startTime as string).getTime(),
+        '2023-03-27',
+      )
+      // Any gap ≥ 24h indicates the date-boundary regression. DST shifts can
+      // contribute ±1h, so allow a generous envelope well under 24h.
+      for (const t of ts) {
+        expect(Math.abs(t.gap)).toBeLessThan(2 * 60 * 60_000)
+      }
+      // Duration on each row is sane (never days-long).
+      for (const t of ts) {
+        expect(Math.abs(t.planned.duration)).toBeLessThan(24 * 60 * 60_000)
+      }
+    })
+
+    // Michael Havey bug #2: timestamps[2].planned.start was wrong by exactly
+    // one day, producing a 24h negative gap. Same class of fix as #1, on the
+    // startTime branch. Fixture: three LINKED FINISH_TIME/FINISH_TIME rows.
+    it('Michael Havey bug #2: LINKED chain does not shift start by 24h', () => {
+      const timers = timestampsFixture2 as unknown as TimerInput[]
+      const active = timers[0]!
+      const ts = createTimestamps(
+        timers,
+        makeTimeset({
+          timerId: active._id,
+          kickoff: new Date(active.startTime as string),
+          lastStop: new Date(active.startTime as string),
+          deadline: new Date(active.finishTime as string),
+          running: true,
+        }),
+        'UTC',
+        new Date(active.startTime as string).getTime(),
+        '2023-03-25',
+      )
+      for (const t of ts) {
+        expect(Math.abs(t.gap)).toBeLessThan(2 * 60 * 60_000)
+        expect(Math.abs(t.planned.duration)).toBeLessThan(24 * 60 * 60_000)
+      }
+    })
+
+    // "Don't carry after Until finish date": FINISH_TIME with finishTime
+    // BEFORE startTime (inverted — planned.duration is negative). Old model
+    // floored carry at 0. New model lets drift cascade, but bounded by the
+    // inversion — no runaway escalation across downstream rows.
+    it('inverted FINISH_TIME: downstream drift is bounded, not cascading', () => {
+      timers[0].type = 'FINISH_TIME'
+      timers[0].startTime = new Date(THREE_PM)
+      timers[0].finishTime = new Date(THREE_PM - 10 * 60_000) // 10 min before startTime
+      timeset.timerId = timers[0]._id
+      timeset.kickoff = THREE_PM
+      timeset.lastStop = THREE_PM
+      timeset.running = true
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM)
+      expect(ts[0].planned.duration).toBe(-10 * 60_000)
+      // Active FINISH_TIME anchor absorbs up to its (negative-capacity) duration.
+      // Drift surfaces as startDrift on the next row — bounded by the inversion.
+      const inheritedDrift = ts[1].startDrift
+      expect(inheritedDrift).toBeGreaterThanOrEqual(0)
+      expect(inheritedDrift).toBeLessThanOrEqual(10 * 60_000)
+      // Downstream row does not amplify drift — it inherits the same bounded value.
+      expect(ts[2].startDrift).toBe(inheritedDrift)
     })
   })
 

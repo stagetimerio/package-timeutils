@@ -1,0 +1,110 @@
+[
+  {
+    "chime": {
+      "yellow": "NONE",
+      "red": "NONE",
+      "zero": "NONE"
+    },
+    "flash": {
+      "yellow": 0,
+      "red": 0,
+      "zero": 0
+    },
+    "_id": "641d3e000d97b634f8e60e7c",
+    "index": 1,
+    "name": "Until 7PM",
+    "extra": "",
+    "notes": "",
+    "showName": true,
+    "showExtra": true,
+    "showNotes": true,
+    "appearance": "COUNTDOWN",
+    "type": "FINISH_TIME",
+    "hours": 0,
+    "minutes": 10,
+    "seconds": 0,
+    "yellow": 60000,
+    "red": 15000,
+    "trigger": "MANUAL",
+    "startTime": "2023-03-27T10:00:00.000Z",
+    "startDate": true,
+    "finishTime": "2023-03-27T11:00:00.000Z",
+    "finishDate": true,
+    "createdAt": "2023-03-24T06:06:56.333Z",
+    "updatedAt": "2023-03-24T06:09:18.752Z",
+    "__v": 0,
+    "id": "641d3e000d97b634f8e60e7c"
+  },
+  {
+    "chime": {
+      "yellow": "NONE",
+      "red": "NONE",
+      "zero": "NONE"
+    },
+    "flash": {
+      "yellow": 0,
+      "red": 0,
+      "zero": 0
+    },
+    "_id": "641d3e030d97b634f8e60e9a",
+    "index": 2,
+    "name": "From 7PM to 6:19AM next day",
+    "extra": "",
+    "notes": "",
+    "showName": true,
+    "showExtra": true,
+    "showNotes": true,
+    "appearance": "COUNTDOWN",
+    "type": "FINISH_TIME",
+    "hours": 0,
+    "minutes": 10,
+    "seconds": 0,
+    "yellow": 60000,
+    "red": 15000,
+    "trigger": "LINKED",
+    "startTime": "2023-03-24T11:00:00.000Z",
+    "startDate": false,
+    "finishTime": "2023-03-27T22:19:00.000Z",
+    "finishDate": true,
+    "createdAt": "2023-03-24T06:06:59.294Z",
+    "updatedAt": "2023-03-24T06:09:52.941Z",
+    "__v": 0,
+    "id": "641d3e030d97b634f8e60e9a"
+  },
+  {
+    "chime": {
+      "yellow": "NONE",
+      "red": "NONE",
+      "zero": "NONE"
+    },
+    "flash": {
+      "yellow": 0,
+      "red": 0,
+      "zero": 0
+    },
+    "_id": "641d3e040d97b634f8e60ea8",
+    "index": 3,
+    "name": "Timer 3",
+    "extra": "",
+    "notes": "",
+    "showName": true,
+    "showExtra": true,
+    "showNotes": true,
+    "appearance": "COUNTDOWN",
+    "type": "DURATION",
+    "hours": 0,
+    "minutes": 10,
+    "seconds": 0,
+    "yellow": 60000,
+    "red": 15000,
+    "trigger": "LINKED",
+    "startTime": null,
+    "startDate": false,
+    "finishTime": null,
+    "finishDate": false,
+    "createdAt": "2023-03-24T06:07:00.518Z",
+    "updatedAt": "2023-03-24T06:07:04.822Z",
+    "__v": 0,
+    "id": "641d3e040d97b634f8e60ea8"
+  }
+]
