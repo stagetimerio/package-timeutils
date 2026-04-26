@@ -369,30 +369,144 @@ describe('createTimestamps', () => {
       expect(ts[0].finishDrift).toBe(min(10)) // planned was 10min, slot took 20min
     })
 
-    it('uses snapshot plannedStart as drift baseline', () => {
+    it('live duration edit on past timer shifts startDrift / finishDrift', () => {
+      // Without snapshot pinning, live edits flow straight through: editing a
+      // past timer's duration after it ran moves both planned.finish and the
+      // chained drift on the next row. The user-placed anchor (none here)
+      // would normally be the truth-teller; without one, edits propagate.
       timers[0].startTime = new Date(THREE_PM)
-      // User edited timer duration AFTER it ran; snapshot preserves the original planned values
       timers[0].minutes = 20 // changed from 10 to 20 after the fact
       timeset.timerId = '2'
       timeset.running = true
       timeset.kickoff = THREE_PM + min(13)
       const memory: MemoryInput = {
         timers: {
-          '1': {
-            start: THREE_PM + min(2),
-            finish: THREE_PM + min(13),
-            elapsed: min(11),
-            plannedStart: THREE_PM,              // snapshot at first kickoff
-            plannedFinish: THREE_PM + min(10),   // was 10-minute timer then
-            plannedDuration: min(10),
-          },
+          '1': { start: THREE_PM + min(2), finish: THREE_PM + min(13), elapsed: min(11) },
         },
       }
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(14), null, memory)
-      // Drift should use snapshot (THREE_PM), not current planned (which is still THREE_PM since startTime didn't change)
+      // planned.start anchored to THREE_PM, planned.finish = THREE_PM + 20min (live)
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(20))
       expect(ts[0].startDrift).toBe(min(2))
-      // finishDrift from snapshot: actual.finish (3PM+13) - snapshot.plannedFinish (3PM+10) = 3min
-      expect(ts[0].finishDrift).toBe(min(3))
+      // finishDrift = actual.finish (3PM+13) - planned.finish (3PM+20) = -7min
+      expect(ts[0].finishDrift).toBe(-min(7))
+    })
+  })
+
+  describe('reverse-walk soft-start derivation', () => {
+    // Pre-kickoff (no active timer) only. Once kickoff happens, forward chain
+    // wins everywhere — phase-3-pivot.md leaves Q8 open and we go conservative.
+
+    it('pre-kickoff with END FINISH_TIME anchor: every upstream row reverse-derives', () => {
+      // Three DURATION timers, no startTimes. Last is FINISH_TIME with finishTime=END.
+      // Wait — fixture timer[2] is DURATION; convert the last to FINISH_TIME.
+      timers[2].type = 'FINISH_TIME'
+      timers[2].finishTime = new Date(THREE_PM + min(60))
+      timeset.timerId = null
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM)
+      // Walk: target = END (3PM+60). t[1] reverse-fills to 50–60, t[0] to 40–50.
+      expect(ts[0].planned.start).toBe(THREE_PM + min(40))
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(50))
+      expect(ts[1].planned.start).toBe(THREE_PM + min(50))
+      expect(ts[1].planned.finish).toBe(THREE_PM + min(60))
+      // FINISH_TIME's plannedStart re-chains from t[1].plannedFinish; slack absorbed.
+      expect(ts[2].planned.start).toBe(THREE_PM + min(60))
+      expect(ts[2].planned.finish).toBe(THREE_PM + min(60))
+      expect(ts[2].planned.duration).toBe(0)
+    })
+
+    it('pre-kickoff with hard startTime mid-chain: rows before reverse from it', () => {
+      timers[1].startTime = new Date(THREE_PM + min(30))
+      timeset.timerId = null
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM)
+      // t[0] reverse-fills from t[1].plannedStart (3PM+30) - 10min = 3PM+20.
+      expect(ts[0].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(30))
+      // t[1] anchored, t[2] forward-chained.
+      expect(ts[1].planned.start).toBe(THREE_PM + min(30))
+      expect(ts[2].planned.start).toBe(THREE_PM + min(40))
+    })
+
+    it('FINISH_TIME without finishTime stops the walk', () => {
+      // t[1] is FINISH_TIME but has no finishTime — variable duration, walk
+      // stops there. Downstream END anchor on t[2] does not propagate to t[0].
+      timers[1].type = 'FINISH_TIME'
+      timers[1].finishTime = null
+      timers[2].type = 'FINISH_TIME'
+      timers[2].finishTime = new Date(THREE_PM + min(60))
+      timeset.timerId = null
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM)
+      // t[0] gets no reverse target — falls back to forward chain (kickoff/now).
+      expect(ts[0].planned.start).toBe(THREE_PM)
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
+    })
+
+    it('multiple anchors: upstream-of-startTime reverses; rows between anchors stay forward', () => {
+      // Five timers, hard startTime at idx 2 and FINISH_TIME-with-finishTime at idx 4.
+      // t[3] is forward-anchored (chained from t[2]'s startTime) — forward wins,
+      // no reverse-fill from t[4]'s anchor. The slack between t[3].planned.finish
+      // and t[4]'s anchor is absorbed into t[4].planned.duration.
+      const five: TimerInput[] = [
+        makeTimer({ _id: '1' }),
+        makeTimer({ _id: '2' }),
+        makeTimer({ _id: '3', startTime: new Date(THREE_PM + min(30)) }),
+        makeTimer({ _id: '4' }),
+        makeTimer({ _id: '5', type: 'FINISH_TIME', finishTime: new Date(THREE_PM + min(70)) }),
+      ]
+      const ts = createTimestamps(five, makeTimeset({ timerId: null }), undefined, THREE_PM)
+      // Walk from idx-2 startTime (3PM+30): t[1] = 3PM+20..30, t[0] = 3PM+10..20.
+      expect(ts[0].planned.start).toBe(THREE_PM + min(10))
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.finish).toBe(THREE_PM + min(30))
+      // t[3] forward-chained from t[2]'s anchor — NOT reverse-derived from t[4].
+      expect(ts[3].planned.start).toBe(THREE_PM + min(40))
+      expect(ts[3].planned.finish).toBe(THREE_PM + min(50))
+      // t[4] FINISH_TIME absorbs slack: 20min slot ending at 3PM+70.
+      expect(ts[4].planned.start).toBe(THREE_PM + min(50))
+      expect(ts[4].planned.finish).toBe(THREE_PM + min(70))
+      expect(ts[4].planned.duration).toBe(min(20))
+    })
+
+    it('active timer present: NO reverse-walk (forward wins post-kickoff)', () => {
+      // Same END anchor as the pre-kickoff test, but timer 1 active. Reverse
+      // skipped — t[0]'s plannedStart stays = kickoff, NOT reverse-derived.
+      timers[2].type = 'FINISH_TIME'
+      timers[2].finishTime = new Date(THREE_PM + min(60))
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM + min(1))
+      // Forward chain: t[0] = kickoff (3PM) → 3PM+10, t[1] = 3PM+10 → 3PM+20.
+      expect(ts[0].planned.start).toBe(THREE_PM)
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+    })
+
+    it('no anchors anywhere: reverse-walk no-op, forward chain only', () => {
+      // Pure case-1: no startTime, no FINISH_TIME. Reverse-walk has no target,
+      // forward chain runs unchanged.
+      timeset.timerId = null
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM)
+      expect(ts[0].planned.start).toBe(THREE_PM) // = now (kickoffMs fallback)
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      expect(ts[2].planned.start).toBe(THREE_PM + min(20))
+    })
+
+    it('overcommit: anchor sits before forward-chain end → negative gap on anchor row', () => {
+      // Hard startTime at idx 1 = 3PM+5min, but t[0] is 10min. Reverse-walk
+      // pulls t[0] back to 3PM-5min..3PM+5min. The anchor row's gap is the
+      // overcommit signal: planned.start - prev.planned.finish = 0 (clean
+      // here because reverse-walk landed exactly on the anchor by construction).
+      timers[1].startTime = new Date(THREE_PM + min(5))
+      timeset.timerId = null
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM)
+      // t[0] reverse-derived to land at anchor: 3PM-5 .. 3PM+5
+      expect(ts[0].planned.start).toBe(THREE_PM - min(5))
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(5))
+      expect(ts[1].planned.start).toBe(THREE_PM + min(5))
+      // gap on anchor row reads 0 — reverse-walk made forward land on anchor.
+      expect(ts[1].gap).toBe(0)
     })
   })
 

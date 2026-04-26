@@ -96,9 +96,6 @@ export interface TimesetInput {
  *   Schedule-history layer (drift math):
  *     `start`  — wall-clock moment of first kickoff
  *     `finish` — wall-clock moment the timer left active (transition point)
- *     `plannedStart` / `plannedFinish` / `plannedDuration` — snapshots of the
- *       timer's planned values at first kickoff, used as the drift baseline
- *       so live edits to duration don't silently shift the zero point
  *
  *   Resume layer (countdown state):
  *     `elapsed` — total countdown time consumed, excluding pauses. When the
@@ -106,17 +103,19 @@ export interface TimesetInput {
  *       countdown resumes from. NOT equal to `finish - start` when the timer
  *       was paused during its run.
  *
- * `createTimestamps` reads `start`/`finish` (+ planned snapshots) for the
- * schedule layer. `elapsed` is for the caller's resume logic — don't derive
- * `actual.duration` from it; use `finish - start` to keep wall-clock identity.
+ * `createTimestamps` reads `start`/`finish` for the schedule layer. `elapsed`
+ * is for the caller's resume logic — don't derive `actual.duration` from it;
+ * use `finish - start` to keep wall-clock identity.
+ *
+ * Drift baselines are NOT pinned via memory snapshots. Planned values are
+ * computed live from current timer config; user-placed hard-time anchors
+ * (`startTime`, FINISH_TIME `finishTime`) are the truth-tellers that catch
+ * silent edits, not a frozen snapshot. See phase-3-pivot.md.
  */
 export interface MemoryTimerEntry {
   start: number | null
   finish: number | null
   elapsed: number
-  plannedStart?: number | null
-  plannedFinish?: number | null
-  plannedDuration?: number | null
 }
 
 export interface MemoryInput {
@@ -164,7 +163,7 @@ export interface Timestamp {
    */
   actual: { start: number, finish: number, duration: number }
 
-  /** `actual.start - planned.start`. Drift entering the timer. Baseline pinned to memory snapshot when present. */
+  /** `actual.start - planned.start`. Drift entering the timer. Baseline reads from live timer config. */
   startDrift: number
 
   /** `actual.finish - planned.finish`. Drift exiting the timer. Grows live on the ACTIVE timer past its end. */
