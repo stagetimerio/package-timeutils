@@ -154,8 +154,53 @@ export function createTimestamps (
       } else if (prevPlannedFinish) {
         plannedStart[i] = prevPlannedFinish
       } else {
-        // First timer with no scheduled start: project from active kickoff or now
-        plannedStart[i] = kickoffMs ?? now
+        // First timer with no scheduled start: walk forward through the
+        // rundown to find the chain's origin — the first row that's either
+        // currently active (live kickoff is truth) or has `memory.start`
+        // (recorded truth, doesn't move). When a row is both, kickoff wins:
+        // stale memory from a prior run mustn't override the live kickoff.
+        // Naïvely using `kickoffMs` here is wrong because it always points
+        // at the *currently active* timer and slides forward on every
+        // switch. Once the anchor lands at row j > 0, back-fill T0..T(j-1)
+        // by subtracting their typed durations so the forward chain lands
+        // cleanly on the anchor. A FINISH_TIME row in the back-fill range
+        // has a chain-dependent duration — bail there and fall through to
+        // live kickoff or now.
+        let anchorIdx = -1
+        let anchorTime: number | null = null
+        for (let j = 0; j < N; j++) {
+          if (j === activeIdx && kickoffMs != null) {
+            anchorIdx = j
+            anchorTime = kickoffMs
+            break
+          }
+          const m = memory.timers?.[String(timers[j]!._id)]
+          if (m?.start != null) {
+            anchorIdx = j
+            anchorTime = m.start
+            break
+          }
+        }
+
+        let origin: number | null = null
+        if (anchorTime != null) {
+          if (anchorIdx === 0) {
+            origin = anchorTime
+          } else {
+            let backfill = anchorTime
+            let bailed = false
+            for (let j = anchorIdx - 1; j >= 0; j--) {
+              if (timers[j]!.type === TIMER_TYPES.FINISH_TIME) {
+                bailed = true
+                break
+              }
+              backfill -= hmsToMilliseconds(timers[j]!)
+            }
+            if (!bailed) origin = backfill
+          }
+        }
+
+        plannedStart[i] = origin ?? kickoffMs ?? now
       }
 
       if (timer.type === TIMER_TYPES.FINISH_TIME) {

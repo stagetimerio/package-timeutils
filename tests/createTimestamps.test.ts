@@ -369,6 +369,109 @@ describe('createTimestamps', () => {
       expect(ts[0].finishDrift).toBe(min(10)) // planned was 10min, slot took 20min
     })
 
+    it('unanchored chain, T0 has memory, T1 active: T0 anchors on memory.start (T2-12)', () => {
+      // Phase-3-post-UX-testing T2-12 regression. No anchors anywhere.
+      // T0 ran 8:28 (10min planned), then user started T1. `timeset.kickoff`
+      // now holds T1's kickoff — using it as the chain origin would slide
+      // T0's planned.start forward to T1's kickoff and produce a phantom
+      // `-8:28` startDrift on T0. Memory.start is the truth-teller: T0's own
+      // memory.start anchors the chain so T0 reads startDrift = 0 and the
+      // duration delta carries forward as T1's startDrift.
+      timeset.timerId = '2'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(8) + 28_000
+      const memory: MemoryInput = {
+        timers: {
+          '1': {
+            start: THREE_PM,
+            finish: THREE_PM + min(8) + 28_000,
+            elapsed: min(8) + 28_000,
+          },
+        },
+      }
+      const now = THREE_PM + min(8) + 30_000
+      const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
+
+      expect(ts[0].state).toBe('PAST')
+      expect(ts[0].hasMemory).toBe(true)
+      expect(ts[0].planned.start).toBe(THREE_PM)
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
+      expect(ts[0].actual.start).toBe(THREE_PM)
+      expect(ts[0].actual.finish).toBe(THREE_PM + min(8) + 28_000)
+      expect(ts[0].startDrift).toBe(0)
+      expect(ts[0].finishDrift).toBe(-(min(1) + 32_000))
+
+      expect(ts[1].state).toBe('ACTIVE')
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      expect(ts[1].actual.start).toBe(THREE_PM + min(8) + 28_000)
+      expect(ts[1].startDrift).toBe(-(min(1) + 32_000))
+    })
+
+    it('unanchored chain, T0 skipped, T1 has memory, T2 active: chain back-fills T0', () => {
+      // Sibling of T2-12. T0 was skipped (no memory). T1 ran from THREE_PM
+      // for 10 min, T2 became active. Forward walk finds T1's memory.start
+      // as the first grounded moment; T0's plannedStart back-fills by
+      // subtracting T0's typed duration so T1.planned.start lands on
+      // T1.memory.start. T0 is positionally PAST without memory → skipped
+      // (zero actual duration), startDrift = 0, finishDrift recovers T0's
+      // full duration.
+      timeset.timerId = '3'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(10)
+      const memory: MemoryInput = {
+        timers: {
+          '2': { start: THREE_PM, finish: THREE_PM + min(10), elapsed: min(10) },
+        },
+      }
+      const now = THREE_PM + min(11)
+      const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
+
+      // T0 — skipped, planned slot back-fills 10 min before THREE_PM
+      expect(ts[0].state).toBe('PAST')
+      expect(ts[0].hasMemory).toBe(false)
+      expect(ts[0].planned.start).toBe(THREE_PM - min(10))
+      expect(ts[0].planned.finish).toBe(THREE_PM)
+      expect(ts[0].actual.duration).toBe(0)
+      expect(ts[0].startDrift).toBe(0)
+      expect(ts[0].finishDrift).toBe(-min(10))
+
+      // T1 — PAST hasMemory, planned slot lands on memory.start
+      expect(ts[1].state).toBe('PAST')
+      expect(ts[1].hasMemory).toBe(true)
+      expect(ts[1].planned.start).toBe(THREE_PM)
+      expect(ts[1].actual.start).toBe(THREE_PM)
+      expect(ts[1].startDrift).toBe(0)
+
+      // T2 — active, planned & actual aligned
+      expect(ts[2].state).toBe('ACTIVE')
+      expect(ts[2].planned.start).toBe(THREE_PM + min(10))
+      expect(ts[2].actual.start).toBe(THREE_PM + min(10))
+      expect(ts[2].startDrift).toBe(0)
+    })
+
+    it('unanchored chain, T0 active with stale memory: kickoff wins, not memory', () => {
+      // Sibling of T2-12. T0 ran THREE_PM..THREE_PM+10min, switched to T1,
+      // switched back to T0 at THREE_PM+30min. Memory from prior run still
+      // on disk but T0 is currently active — its live kickoff is truth.
+      // Walk picks kickoff at the active row, ignoring stale memory there.
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(30)
+      const memory: MemoryInput = {
+        timers: {
+          '1': { start: THREE_PM, finish: THREE_PM + min(10), elapsed: min(10) },
+        },
+      }
+      const now = THREE_PM + min(31)
+      const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
+
+      expect(ts[0].state).toBe('ACTIVE')
+      expect(ts[0].hasMemory).toBe(true)
+      expect(ts[0].planned.start).toBe(THREE_PM + min(30))
+      expect(ts[0].actual.start).toBe(THREE_PM + min(30))
+      expect(ts[0].startDrift).toBe(0)
+    })
+
     it('live duration edit on past timer shifts startDrift / finishDrift', () => {
       // Without snapshot pinning, live edits flow straight through: editing a
       // past timer's duration after it ran moves both planned.finish and the
