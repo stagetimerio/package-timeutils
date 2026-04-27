@@ -1,6 +1,6 @@
 {
   "name": "@stagetimerio/timeutils",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "description": "Timer utilities for stagetimer.io",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
