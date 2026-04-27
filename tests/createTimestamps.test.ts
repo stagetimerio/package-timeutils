@@ -169,6 +169,34 @@ describe('createTimestamps', () => {
       expect(ts[1].startDrift).toBe(min(3))
     })
 
+    it('after a pause-and-jump, "what time did we actually start" sticks; only the projected finish moves', () => {
+      // The original first-press was 5:00 late. Operator paused, jumped 30s
+      // forward, resumed — kickoff slid to 5:30 late. The active row's
+      // start drift must still read +5:00 (the real history, kept in
+      // memory.start), but its finish — and every downstream row's
+      // start — must reflect where the playhead is now (+5:30).
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(5) + 30_000 // 5:30 late after jump
+      const memory = {
+        timers: {
+          '1': { start: THREE_PM + min(5), finish: null, elapsed: min(2) },
+        },
+      }
+      const now = THREE_PM + min(7)
+      const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
+      // History on the active row: memory.start, +5:00 drift
+      expect(ts[0].actual.start).toBe(THREE_PM + min(5))
+      expect(ts[0].startDrift).toBe(min(5))
+      // Projection on the active row: kickoff + duration, +5:30 drift
+      expect(ts[0].actual.finish).toBe(THREE_PM + min(15) + 30_000)
+      expect(ts[0].finishDrift).toBe(min(5) + 30_000)
+      // Downstream chains from the projection, not the history
+      expect(ts[1].actual.start).toBe(THREE_PM + min(15) + 30_000)
+      expect(ts[1].startDrift).toBe(min(5) + 30_000)
+    })
+
   })
 
   describe('FINISH_TIME anchoring in actual chain', () => {

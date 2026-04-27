@@ -190,7 +190,10 @@ export function createTimestamps (
         if (mem?.start) actualStart = mem.start
         break
       case TIMESTAMP_STATE.ACTIVE:
-        if (kickoffMs) actualStart = kickoffMs
+        // Prefer memory.start over kickoff: kickoff drifts with pause/resume/
+        // jump cycles, memory.start preserves the original first-kickoff.
+        if (mem?.start) actualStart = mem.start
+        else if (kickoffMs) actualStart = kickoffMs
         break
       case TIMESTAMP_STATE.FUTURE:
         // Hard `startTime` honors the scheduled gap; chain forward only if
@@ -209,15 +212,20 @@ export function createTimestamps (
         if (row.hasMemory) actualFinish = mem!.finish!
         else actualFinish = actualStart // skipped: collapse to zero duration
         break
-      case TIMESTAMP_STATE.ACTIVE:
-        if (actualStart) {
+      case TIMESTAMP_STATE.ACTIVE: {
+        // Project from current playhead (kickoff), not actualStart — actualStart
+        // may be memory.start (the original first-kickoff in the past), but the
+        // finish projection has to reflect where the playhead is *now*.
+        const projection = kickoffMs ?? actualStart
+        if (projection) {
           if (timer.type === TIMER_TYPES.FINISH_TIME && plannedFinish) {
-            actualFinish = Math.max(plannedFinish, actualStart, now)
+            actualFinish = Math.max(plannedFinish, projection, now)
           } else {
-            actualFinish = Math.max(actualStart + plannedDuration, now)
+            actualFinish = Math.max(projection + plannedDuration, now)
           }
         }
         break
+      }
       case TIMESTAMP_STATE.FUTURE:
         if (actualStart) {
           if (timer.type === TIMER_TYPES.FINISH_TIME) {
