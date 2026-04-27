@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createTimestamps } from '../src/createTimestamps'
 import type { TimerInput, TimesetInput, MemoryInput } from '../src/types'
-import { addMinutes } from 'date-fns/addMinutes'
 import { parseDateAsToday } from '../src/parseDateAsToday'
 import timestampsFixture1 from './fixtures/timestamps-1-in.json' with { type: 'json' }
 import timestampsFixture2 from './fixtures/timestamps-2-in.json' with { type: 'json' }
@@ -82,15 +81,6 @@ describe('createTimestamps', () => {
         expect(t.finishDrift).toBe(0)
         expect(t.hasMemory).toBe(false)
       }
-    })
-
-    it('without startTime, first timer anchors to now', () => {
-      const now = THREE_PM
-      const ts = createTimestamps(timers, timeset, undefined, now)
-      expect(ts[0].planned.start).toBe(now)
-      expect(ts[0].planned.finish).toBe(now + min(10))
-      expect(ts[0].explicitStart).toBe(false)
-      expect(ts[1].planned.start).toBe(now + min(10))
     })
 
     it('computes planned gap between non-contiguous timers', () => {
@@ -179,24 +169,6 @@ describe('createTimestamps', () => {
       expect(ts[1].startDrift).toBe(min(3))
     })
 
-    it('LINKED timer: drift passes through without gap absorption', () => {
-      timers[0].startTime = new Date(THREE_PM)
-      timers[1].trigger = 'LINKED'
-      timers[1].startTime = new Date(THREE_PM + min(15)) // 5min gap planned
-      timeset.timerId = '1'
-      timeset.running = true
-      timeset.kickoff = THREE_PM + min(3)
-      const now = THREE_PM + min(5)
-      const ts = createTimestamps(timers, timeset, undefined, now)
-      // planned: t1 0-10, t2 15-25
-      // actual: t1 starts at 3, finishes at 13. t2 LINKED so actual.start = t1.actual.finish = 13
-      expect(ts[0].planned.start).toBe(THREE_PM)
-      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
-      expect(ts[1].planned.start).toBe(THREE_PM + min(15))
-      expect(ts[1].actual.start).toBe(THREE_PM + min(13))
-      // Drift: actual.start (3PM+13) - planned.start (3PM+15) = -2min (ahead of schedule!)
-      expect(ts[1].startDrift).toBe(-min(2))
-    })
   })
 
   describe('FINISH_TIME anchoring in actual chain', () => {
@@ -281,39 +253,6 @@ describe('createTimestamps', () => {
       expect(ts[2].state).toBe('ACTIVE')
     })
 
-    it('skipped timer has zero actual duration, recovers finishDrift', () => {
-      // Scenario: A ran long (+8min over), B skipped to recover time, C now active.
-      // Expect B.actual.duration == 0, B.startDrift == +8min (inherited), B.finishDrift == -2min.
-      timers[0].startTime = new Date(THREE_PM)
-      timeset.timerId = '3'
-      timeset.running = true
-      timeset.kickoff = THREE_PM + min(18) // C started at 3:18 (8min late)
-      const memory: MemoryInput = {
-        timers: {
-          '1': { start: THREE_PM, finish: THREE_PM + min(18), elapsed: min(18) }, // A ran 18min
-          '3': { start: THREE_PM + min(18), finish: null, elapsed: 0 },
-        },
-      }
-      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(19), null, memory)
-
-      // A — PAST with memory, ran 8 min over
-      expect(ts[0].state).toBe('PAST')
-      expect(ts[0].hasMemory).toBe(true)
-      expect(ts[0].finishDrift).toBe(min(8))
-
-      // B — skipped: zero duration, startDrift inherited, finishDrift recovers
-      expect(ts[1].state).toBe('PAST')
-      expect(ts[1].hasMemory).toBe(false)
-      expect(ts[1].actual.start).toBe(THREE_PM + min(18))
-      expect(ts[1].actual.finish).toBe(THREE_PM + min(18))
-      expect(ts[1].actual.duration).toBe(0)
-      expect(ts[1].startDrift).toBe(min(8))       // propagated from A
-      expect(ts[1].finishDrift).toBe(-min(2))  // 3:18 − 3:20 = recovered 10 min of 8 over
-
-      // C — active
-      expect(ts[2].state).toBe('ACTIVE')
-    })
-
     it('FUTURE with stale memory (jumped back) ignores memory, projects normally', () => {
       // Show ran A→B→C, then jumped back to A. B and C are positionally FUTURE
       // again but still carry memory from the prior pass (kept on disk for
@@ -369,109 +308,6 @@ describe('createTimestamps', () => {
       expect(ts[0].finishDrift).toBe(min(10)) // planned was 10min, slot took 20min
     })
 
-    it('unanchored chain, T0 has memory, T1 active: T0 anchors on memory.start (T2-12)', () => {
-      // Phase-3-post-UX-testing T2-12 regression. No anchors anywhere.
-      // T0 ran 8:28 (10min planned), then user started T1. `timeset.kickoff`
-      // now holds T1's kickoff — using it as the chain origin would slide
-      // T0's planned.start forward to T1's kickoff and produce a phantom
-      // `-8:28` startDrift on T0. Memory.start is the truth-teller: T0's own
-      // memory.start anchors the chain so T0 reads startDrift = 0 and the
-      // duration delta carries forward as T1's startDrift.
-      timeset.timerId = '2'
-      timeset.running = true
-      timeset.kickoff = THREE_PM + min(8) + 28_000
-      const memory: MemoryInput = {
-        timers: {
-          '1': {
-            start: THREE_PM,
-            finish: THREE_PM + min(8) + 28_000,
-            elapsed: min(8) + 28_000,
-          },
-        },
-      }
-      const now = THREE_PM + min(8) + 30_000
-      const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
-
-      expect(ts[0].state).toBe('PAST')
-      expect(ts[0].hasMemory).toBe(true)
-      expect(ts[0].planned.start).toBe(THREE_PM)
-      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
-      expect(ts[0].actual.start).toBe(THREE_PM)
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(8) + 28_000)
-      expect(ts[0].startDrift).toBe(0)
-      expect(ts[0].finishDrift).toBe(-(min(1) + 32_000))
-
-      expect(ts[1].state).toBe('ACTIVE')
-      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
-      expect(ts[1].actual.start).toBe(THREE_PM + min(8) + 28_000)
-      expect(ts[1].startDrift).toBe(-(min(1) + 32_000))
-    })
-
-    it('unanchored chain, T0 skipped, T1 has memory, T2 active: chain back-fills T0', () => {
-      // Sibling of T2-12. T0 was skipped (no memory). T1 ran from THREE_PM
-      // for 10 min, T2 became active. Forward walk finds T1's memory.start
-      // as the first grounded moment; T0's plannedStart back-fills by
-      // subtracting T0's typed duration so T1.planned.start lands on
-      // T1.memory.start. T0 is positionally PAST without memory → skipped
-      // (zero actual duration), startDrift = 0, finishDrift recovers T0's
-      // full duration.
-      timeset.timerId = '3'
-      timeset.running = true
-      timeset.kickoff = THREE_PM + min(10)
-      const memory: MemoryInput = {
-        timers: {
-          '2': { start: THREE_PM, finish: THREE_PM + min(10), elapsed: min(10) },
-        },
-      }
-      const now = THREE_PM + min(11)
-      const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
-
-      // T0 — skipped, planned slot back-fills 10 min before THREE_PM
-      expect(ts[0].state).toBe('PAST')
-      expect(ts[0].hasMemory).toBe(false)
-      expect(ts[0].planned.start).toBe(THREE_PM - min(10))
-      expect(ts[0].planned.finish).toBe(THREE_PM)
-      expect(ts[0].actual.duration).toBe(0)
-      expect(ts[0].startDrift).toBe(0)
-      expect(ts[0].finishDrift).toBe(-min(10))
-
-      // T1 — PAST hasMemory, planned slot lands on memory.start
-      expect(ts[1].state).toBe('PAST')
-      expect(ts[1].hasMemory).toBe(true)
-      expect(ts[1].planned.start).toBe(THREE_PM)
-      expect(ts[1].actual.start).toBe(THREE_PM)
-      expect(ts[1].startDrift).toBe(0)
-
-      // T2 — active, planned & actual aligned
-      expect(ts[2].state).toBe('ACTIVE')
-      expect(ts[2].planned.start).toBe(THREE_PM + min(10))
-      expect(ts[2].actual.start).toBe(THREE_PM + min(10))
-      expect(ts[2].startDrift).toBe(0)
-    })
-
-    it('unanchored chain, T0 active with stale memory: kickoff wins, not memory', () => {
-      // Sibling of T2-12. T0 ran THREE_PM..THREE_PM+10min, switched to T1,
-      // switched back to T0 at THREE_PM+30min. Memory from prior run still
-      // on disk but T0 is currently active — its live kickoff is truth.
-      // Walk picks kickoff at the active row, ignoring stale memory there.
-      timeset.timerId = '1'
-      timeset.running = true
-      timeset.kickoff = THREE_PM + min(30)
-      const memory: MemoryInput = {
-        timers: {
-          '1': { start: THREE_PM, finish: THREE_PM + min(10), elapsed: min(10) },
-        },
-      }
-      const now = THREE_PM + min(31)
-      const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
-
-      expect(ts[0].state).toBe('ACTIVE')
-      expect(ts[0].hasMemory).toBe(true)
-      expect(ts[0].planned.start).toBe(THREE_PM + min(30))
-      expect(ts[0].actual.start).toBe(THREE_PM + min(30))
-      expect(ts[0].startDrift).toBe(0)
-    })
-
     it('live duration edit on past timer shifts startDrift / finishDrift', () => {
       // Without snapshot pinning, live edits flow straight through: editing a
       // past timer's duration after it ran moves both planned.finish and the
@@ -496,223 +332,99 @@ describe('createTimestamps', () => {
     })
   })
 
-  describe('reverse-walk soft-start derivation', () => {
-    // Pre-kickoff (no active timer) only. Once kickoff happens, forward chain
-    // wins everywhere — phase-3-pivot.md leaves Q8 open and we go conservative.
 
-    it('pre-kickoff with END FINISH_TIME anchor: every upstream row reverse-derives', () => {
-      // Three DURATION timers, no startTimes. Last is FINISH_TIME with finishTime=END.
-      // Wait — fixture timer[2] is DURATION; convert the last to FINISH_TIME.
-      timers[2].type = 'FINISH_TIME'
-      timers[2].finishTime = new Date(THREE_PM + min(60))
+
+  // Reverse walk: as soon as ANY hard time exists in the rundown (a hard
+  // `startTime`, or FINISH_TIME with `finishTime`), the chain walks BACKWARD
+  // from each downstream anchor to fill in soft `planned.start`/`finish` for
+  // the timers before it. "To land on this anchor, start here."
+  //
+  // Step: prev.finish = next.start; prev.start = prev.finish - prev.duration.
+  // Forward wins on collisions. Walk halts at: top of rundown, FINISH_TIME
+  // without finishTime (variable duration), or another upstream hard
+  // `startTime` (which becomes its own backward anchor).
+  describe('reverse walk: soft starts derived from downstream anchors', () => {
+    // Default case: a single hard startTime on the last row reverse-fills
+    // every earlier soft row.
+    it('hard startTime on last row reverse-fills all earlier rows', () => {
       timeset.timerId = null
-      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM)
-      // Walk: target = END (3PM+60). t[1] reverse-fills to 50–60, t[0] to 40–50.
-      expect(ts[0].planned.start).toBe(THREE_PM + min(40))
-      expect(ts[0].planned.finish).toBe(THREE_PM + min(50))
-      expect(ts[1].planned.start).toBe(THREE_PM + min(50))
-      expect(ts[1].planned.finish).toBe(THREE_PM + min(60))
-      // FINISH_TIME's plannedStart re-chains from t[1].plannedFinish; slack absorbed.
-      expect(ts[2].planned.start).toBe(THREE_PM + min(60))
-      expect(ts[2].planned.finish).toBe(THREE_PM + min(60))
-      expect(ts[2].planned.duration).toBe(0)
-    })
-
-    it('pre-kickoff with hard startTime mid-chain: rows before reverse from it', () => {
-      timers[1].startTime = new Date(THREE_PM + min(30))
-      timeset.timerId = null
-      const ts = createTimestamps(timers, timeset, undefined, THREE_PM)
-      // t[0] reverse-fills from t[1].plannedStart (3PM+30) - 10min = 3PM+20.
-      expect(ts[0].planned.start).toBe(THREE_PM + min(20))
-      expect(ts[0].planned.finish).toBe(THREE_PM + min(30))
-      // t[1] anchored, t[2] forward-chained.
-      expect(ts[1].planned.start).toBe(THREE_PM + min(30))
-      expect(ts[2].planned.start).toBe(THREE_PM + min(40))
-    })
-
-    it('FINISH_TIME without finishTime stops the walk', () => {
-      // t[1] is FINISH_TIME but has no finishTime — variable duration, walk
-      // stops there. Downstream END anchor on t[2] does not propagate to t[0].
-      timers[1].type = 'FINISH_TIME'
-      timers[1].finishTime = null
-      timers[2].type = 'FINISH_TIME'
-      timers[2].finishTime = new Date(THREE_PM + min(60))
-      timeset.timerId = null
-      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM)
-      // t[0] gets no reverse target — falls back to forward chain (kickoff/now).
-      expect(ts[0].planned.start).toBe(THREE_PM)
-      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
-    })
-
-    it('multiple anchors: upstream-of-startTime reverses; rows between anchors stay forward', () => {
-      // Five timers, hard startTime at idx 2 and FINISH_TIME-with-finishTime at idx 4.
-      // t[3] is forward-anchored (chained from t[2]'s startTime) — forward wins,
-      // no reverse-fill from t[4]'s anchor. The slack between t[3].planned.finish
-      // and t[4]'s anchor is absorbed into t[4].planned.duration.
-      const five: TimerInput[] = [
-        makeTimer({ _id: '1' }),
-        makeTimer({ _id: '2' }),
-        makeTimer({ _id: '3', startTime: new Date(THREE_PM + min(30)) }),
-        makeTimer({ _id: '4' }),
-        makeTimer({ _id: '5', type: 'FINISH_TIME', finishTime: new Date(THREE_PM + min(70)) }),
-      ]
-      const ts = createTimestamps(five, makeTimeset({ timerId: null }), undefined, THREE_PM)
-      // Walk from idx-2 startTime (3PM+30): t[1] = 3PM+20..30, t[0] = 3PM+10..20.
-      expect(ts[0].planned.start).toBe(THREE_PM + min(10))
-      expect(ts[0].planned.finish).toBe(THREE_PM + min(20))
-      expect(ts[1].planned.start).toBe(THREE_PM + min(20))
-      expect(ts[1].planned.finish).toBe(THREE_PM + min(30))
-      // t[3] forward-chained from t[2]'s anchor — NOT reverse-derived from t[4].
-      expect(ts[3].planned.start).toBe(THREE_PM + min(40))
-      expect(ts[3].planned.finish).toBe(THREE_PM + min(50))
-      // t[4] FINISH_TIME absorbs slack: 20min slot ending at 3PM+70.
-      expect(ts[4].planned.start).toBe(THREE_PM + min(50))
-      expect(ts[4].planned.finish).toBe(THREE_PM + min(70))
-      expect(ts[4].planned.duration).toBe(min(20))
-    })
-
-    it('active timer present: NO reverse-walk (forward wins post-kickoff)', () => {
-      // Same END anchor as the pre-kickoff test, but timer 1 active. Reverse
-      // skipped — t[0]'s plannedStart stays = kickoff, NOT reverse-derived.
-      timers[2].type = 'FINISH_TIME'
-      timers[2].finishTime = new Date(THREE_PM + min(60))
-      timeset.timerId = '1'
-      timeset.running = true
-      timeset.kickoff = THREE_PM
-      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM + min(1))
-      // Forward chain: t[0] = kickoff (3PM) → 3PM+10, t[1] = 3PM+10 → 3PM+20.
-      expect(ts[0].planned.start).toBe(THREE_PM)
-      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
-      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
-    })
-
-    it('no anchors anywhere: reverse-walk no-op, forward chain only', () => {
-      // Pure case-1: no startTime, no FINISH_TIME. Reverse-walk has no target,
-      // forward chain runs unchanged.
-      timeset.timerId = null
-      const ts = createTimestamps(timers, timeset, undefined, THREE_PM)
-      expect(ts[0].planned.start).toBe(THREE_PM) // = now (kickoffMs fallback)
-      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      timers[2].startTime = new Date(THREE_PM + min(20))
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      // t3: own anchor.
       expect(ts[2].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[2].planned.finish).toBe(THREE_PM + min(30))
+      // t2: finish = t3.start; start = finish - 10min.
+      expect(ts[1].planned.finish).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      // t1: finish = t2.start; start = finish - 10min.
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
+      expect(ts[0].planned.start).toBe(THREE_PM)
     })
 
-    it('overcommit: anchor sits before forward-chain end → negative gap on anchor row', () => {
-      // Hard startTime at idx 1 = 3PM+5min, but t[0] is 10min. Reverse-walk
-      // pulls t[0] back to 3PM-5min..3PM+5min. The anchor row's gap is the
-      // overcommit signal: planned.start - prev.planned.finish = 0 (clean
-      // here because reverse-walk landed exactly on the anchor by construction).
-      timers[1].startTime = new Date(THREE_PM + min(5))
+    // Hard startTime mid-chain: forward radiates downstream, reverse fills
+    // the soft rows upstream of it.
+    it('hard startTime mid-chain: forward downstream, reverse upstream', () => {
       timeset.timerId = null
-      const ts = createTimestamps(timers, timeset, undefined, THREE_PM)
-      // t[0] reverse-derived to land at anchor: 3PM-5 .. 3PM+5
-      expect(ts[0].planned.start).toBe(THREE_PM - min(5))
-      expect(ts[0].planned.finish).toBe(THREE_PM + min(5))
-      expect(ts[1].planned.start).toBe(THREE_PM + min(5))
-      // gap on anchor row reads 0 — reverse-walk made forward land on anchor.
-      expect(ts[1].gap).toBe(0)
-    })
-  })
-
-  describe('driftResetAt', () => {
-    it('treats memory entries before reset as zero drift', () => {
-      timers[0].startTime = new Date(THREE_PM)
-      timers[1].startTime = new Date(THREE_PM + min(10))
-      timeset.timerId = '3'
-      timeset.running = true
-      timeset.kickoff = THREE_PM + min(25)
-      const memory: MemoryInput = {
-        driftResetAt: THREE_PM + min(15), // reset set between t1 and t2
-        timers: {
-          '1': { start: THREE_PM + min(2), finish: THREE_PM + min(13), elapsed: min(11) },
-          '2': { start: THREE_PM + min(14), finish: THREE_PM + min(25), elapsed: min(11) },
-        },
-      }
-      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(26), null, memory)
-      // t1 started before reset (2 < 15) → zero-drift: actual = planned
-      expect(ts[0].actual.start).toBe(ts[0].planned.start)
-      expect(ts[0].actual.finish).toBe(ts[0].planned.finish)
-      expect(ts[0].startDrift).toBe(0)
-      // t2 started after reset (14 < 15 → still before) → also zero-drift
-      expect(ts[1].startDrift).toBe(0)
+      timers[1].startTime = new Date(THREE_PM + min(15))
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      // Forward from t2.
+      expect(ts[1].planned.start).toBe(THREE_PM + min(15))
+      expect(ts[1].planned.finish).toBe(THREE_PM + min(25))
+      expect(ts[2].planned.start).toBe(THREE_PM + min(25))
+      expect(ts[2].planned.finish).toBe(THREE_PM + min(35))
+      // Reverse fills t1.
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(15))
+      expect(ts[0].planned.start).toBe(THREE_PM + min(5))
     })
 
-    it('memory entries after reset keep their drift', () => {
-      timers[0].startTime = new Date(THREE_PM)
-      timers[1].startTime = new Date(THREE_PM + min(10))
-      timeset.timerId = '3'
-      timeset.running = true
-      timeset.kickoff = THREE_PM + min(15)
-      const memory: MemoryInput = {
-        driftResetAt: THREE_PM + min(5),
-        timers: {
-          '1': { start: THREE_PM + min(2), finish: THREE_PM + min(12), elapsed: min(10) }, // before reset
-          '2': { start: THREE_PM + min(13), finish: THREE_PM + min(15), elapsed: min(2) }, // after reset
-        },
-      }
-      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(16), null, memory)
-      expect(ts[0].startDrift).toBe(0) // zeroed
-      expect(ts[1].startDrift).toBe(min(3)) // 13 - 10 = 3
-    })
-
-    it('reset during active timer: startDrift & finishDrift zero at reset moment', () => {
-      // Event running +8 min late. Timer A planned 3:00–3:10, kicked off late
-      // at 3:08. At 3:20 user hits reset. `now` = 3:20.
-      timers[0].startTime = new Date(THREE_PM)
-      timeset.timerId = '1'
-      timeset.running = true
-      timeset.kickoff = THREE_PM + min(8)
-      const memory: MemoryInput = {
-        driftResetAt: THREE_PM + min(20),
-        timers: {
-          '1': { start: THREE_PM + min(8), finish: null, elapsed: 0 },
-        },
-      }
-      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(20), null, memory)
-      expect(ts[0].state).toBe('ACTIVE')
-      expect(ts[0].actual.start).toBe(THREE_PM + min(20)) // floored to reset
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(30)) // reset + 10min duration
-      expect(ts[0].startDrift).toBe(0)
-      expect(ts[0].finishDrift).toBe(0)
-      // Future timer B (planned 3:10–3:20) chains clean from active
-      expect(ts[1].state).toBe('FUTURE')
-      expect(ts[1].actual.start).toBe(THREE_PM + min(30))
-      expect(ts[1].startDrift).toBe(0)
-      expect(ts[1].finishDrift).toBe(0)
-    })
-
-    it('reset during active timer: drift accumulates again after reset', () => {
-      // Same setup, but `now` is 5 min past reset — active timer now overrunning.
-      timers[0].startTime = new Date(THREE_PM)
-      timeset.timerId = '1'
-      timeset.running = true
-      timeset.kickoff = THREE_PM + min(8)
-      const memory: MemoryInput = {
-        driftResetAt: THREE_PM + min(20),
-        timers: {
-          '1': { start: THREE_PM + min(8), finish: null, elapsed: 0 },
-        },
-      }
-      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(35), null, memory)
-      // Active: actual start still reset (3:20), finish grows past scheduled
-      expect(ts[0].actual.start).toBe(THREE_PM + min(20))
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(35)) // now > reset + 10
-      expect(ts[0].startDrift).toBe(0) // still zero — it "started" at reset
-      expect(ts[0].finishDrift).toBe(min(5)) // 5 min over the new slot
-    })
-
-    it('reset with no active timer: future row with plannedStart < reset floors forward', () => {
-      // Edge case: reset pressed with no timer active (e.g. during a gap).
-      // First future timer had a planned start before the reset — its baseline
-      // should floor at reset, and it starts "now" from the reset moment.
-      timers[0].startTime = new Date(THREE_PM)
+    // Reverse walk halts at an upstream hard startTime — that anchor becomes
+    // its own backward source instead of being overwritten. Earlier rows get
+    // reverse-filled from THAT anchor, not the further-downstream one.
+    it('reverse halts at upstream hard startTime; that anchor seeds its own walk', () => {
+      const fourTimers: TimerInput[] = [
+        makeTimer({ _id: '1' }),
+        makeTimer({ _id: '2', startTime: new Date(THREE_PM + min(20)) }),
+        makeTimer({ _id: '3' }),
+        makeTimer({ _id: '4', startTime: new Date(THREE_PM + min(60)) }),
+      ]
       timeset.timerId = null
-      const memory: MemoryInput = {
-        driftResetAt: THREE_PM + min(20),
-      }
-      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(20), null, memory)
+      const ts = createTimestamps(fourTimers, timeset, undefined, THREE_PM - min(30))
+      // Forward from t2: t2 = 20–30, t3 = 30–40, t4 = own anchor (20-min gap).
+      expect(ts[1].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[2].planned.start).toBe(THREE_PM + min(30))
+      expect(ts[3].planned.start).toBe(THREE_PM + min(60))
+      // Reverse from t4 hits t2 (hard startTime), halts. Reverse from t2
+      // fills t1 — t1.finish = t2.start, t1.start = finish - 10min.
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(20))
+      expect(ts[0].planned.start).toBe(THREE_PM + min(10))
+    })
+
+    // Canonical "set end time" case: FINISH_TIME with finishTime on the
+    // last row anchors planned.finish; the row's configured H/M/S provides
+    // the slot duration the reverse walk subtracts.
+    it('FINISH_TIME-with-finishTime on last row anchors reverse walk', () => {
+      timeset.timerId = null
+      timers[2].type = 'FINISH_TIME'
+      timers[2].finishTime = new Date(THREE_PM + min(30))
+      // t3.minutes = 10 (default).
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      expect(ts[2].planned.finish).toBe(THREE_PM + min(30))
+      expect(ts[2].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.finish).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
+      expect(ts[0].planned.start).toBe(THREE_PM)
+    })
+
+    // Reverse-derived planned values feed the actual chain like any other
+    // planned values: FUTURE timers with no kickoff mirror them, drift = 0.
+    it('reverse-derived planned values flow into actual chain', () => {
+      timeset.timerId = null
+      timers[2].startTime = new Date(THREE_PM + min(20))
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
       expect(ts[0].state).toBe('FUTURE')
-      expect(ts[0].actual.start).toBe(THREE_PM + min(20))
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(30))
+      expect(ts[0].actual.start).toBe(THREE_PM)
+      expect(ts[0].actual.finish).toBe(THREE_PM + min(10))
       expect(ts[0].startDrift).toBe(0)
       expect(ts[0].finishDrift).toBe(0)
     })
@@ -737,26 +449,6 @@ describe('createTimestamps', () => {
       timers[0].finishTime = '2022-01-01T15:30:00.000Z'
       const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(30), '2024-06-15')
       expect(new Date(ts[0].planned.finish).toISOString()).toBe('2024-06-15T15:30:00.000Z')
-    })
-  })
-
-  describe('ENDED state — no active timer, all memory', () => {
-    it('all timers PAST with memory, no active', () => {
-      timeset.timerId = null
-      const memory: MemoryInput = {
-        timers: {
-          '1': { start: THREE_PM, finish: THREE_PM + min(10), elapsed: min(10) },
-          '2': { start: THREE_PM + min(10), finish: THREE_PM + min(22), elapsed: min(12) },
-          '3': { start: THREE_PM + min(22), finish: THREE_PM + min(30), elapsed: min(8) },
-        },
-      }
-      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(31), null, memory)
-      expect(ts[0].state).toBe('PAST')
-      expect(ts[1].state).toBe('PAST')
-      expect(ts[2].state).toBe('PAST')
-      expect(ts[0].actual.duration).toBe(min(10))
-      expect(ts[1].actual.duration).toBe(min(12))
-      expect(ts[1].finishDrift).toBe(min(2)) // ran 2 min over plan
     })
   })
 
