@@ -69,25 +69,36 @@ export type TimerTrigger = 'MANUAL' | 'LINKED' | 'SCHEDULED'
  */
 export type TimestampState = 'PAST' | 'ACTIVE' | 'FUTURE'
 
+/**
+ * Canonical shape inside `createTimestamps`. Callers normalize at the
+ * boundary: server-side `startTime`/`finishTime` come straight from Mongoose
+ * as `Date`; client-side they're ISO strings that the caller wraps in
+ * `new Date()` before calling. ObjectId is serialized to string. All
+ * numeric fields have schema defaults and are always present.
+ */
 export interface TimerInput {
-  _id: string | number
+  _id: string
   type: TimerType
   trigger: TimerTrigger
-  hours?: number
-  minutes?: number
-  seconds?: number
-  startTime?: string | Date | null
-  startDatePlus?: number
-  finishTime?: string | Date | null
-  finishDatePlus?: number
+  hours: number
+  minutes: number
+  seconds: number
+  startTime: Date | null
+  startDatePlus: number
+  finishTime: Date | null
+  finishDatePlus: number
 }
 
+/**
+ * `timerId` is an ObjectId serialized to string. `kickoff`/`lastStop`/
+ * `deadline` are epoch ms — Mongo stores them as `Number`, never `Date`.
+ */
 export interface TimesetInput {
-  timerId: string | number | null
+  timerId: string | null
   running: boolean
-  kickoff: number | Date | null
-  lastStop: number | Date | null
-  deadline?: number | Date | null
+  kickoff: number | null
+  lastStop: number | null
+  deadline: number | null
 }
 
 /**
@@ -147,30 +158,34 @@ export interface MemoryInput {
  */
 export interface Timestamp {
   /** Timer's `_id`, passed through from input. */
-  timerId: string | number
+  timerId: string
 
   /** Positional label (see `TimestampState`). Orthogonal to `hasMemory`. */
   state: TimestampState
 
-  /** Scheduled times from current timer config. */
-  planned: { start: number, finish: number, duration: number }
+  /**
+   * Scheduled times from current timer config. `start`/`finish` are `null`
+   * when the chain has no upstream anchor (a timer with no `startTime` and no
+   * resolvable predecessor). `duration` defaults to `0` when unknown — durations
+   * can never be negative, so `0` is the honest "don't know" value.
+   */
+  planned: { start: number | null, finish: number | null, duration: number }
 
   /**
    * Realised times: memory for PAST, kickoff+live for ACTIVE, projected for
-   * FUTURE. All wall-clock — `duration === finish - start` holds for every row.
-   * For countdown time consumed (excluding pauses) on PAST timers, read
-   * `memory.elapsed` directly; it's a different concept.
+   * FUTURE. Falls back to `planned` when nothing better is known — so `actual`
+   * inherits `null` when planned is null.
    */
-  actual: { start: number, finish: number, duration: number }
+  actual: { start: number | null, finish: number | null, duration: number }
 
-  /** `actual.start - planned.start`. Drift entering the timer. Baseline reads from live timer config. */
-  startDrift: number
+  /** `actual.start - planned.start`. `null` when either side is null. */
+  startDrift: number | null
 
-  /** `actual.finish - planned.finish`. Drift exiting the timer. Grows live on the ACTIVE timer past its end. */
-  finishDrift: number
+  /** `actual.finish - planned.finish`. `null` when either side is null. */
+  finishDrift: number | null
 
-  /** Planned gap before this timer (`planned.start - prev.planned.finish`). 0 for the first. */
-  gap: number
+  /** Planned gap before this timer (`planned.start - prev.planned.finish`). `null` when either side is null; `0` for the first. */
+  gap: number | null
 
   /** Timer has a real memory entry (`finish != null`). Orthogonal to `state`. */
   hasMemory: boolean
