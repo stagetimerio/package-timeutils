@@ -213,15 +213,27 @@ export function createTimestamps (
         else actualFinish = actualStart // skipped: collapse to zero duration
         break
       case TIMESTAMP_STATE.ACTIVE: {
-        // Project from current playhead (kickoff), not actualStart — actualStart
-        // may be memory.start (the original first-kickoff in the past), but the
-        // finish projection has to reflect where the playhead is *now*.
-        const projection = kickoffMs ?? actualStart
-        if (projection) {
+        // Project from the live playhead.
+        //   Running: playhead = now; elapsed = now − kickoff.
+        //   Paused:  playhead = lastStop; elapsed = lastStop − kickoff.
+        // movePlayhead shifts lastStop (not kickoff) while paused, so the
+        // projection has to read from it — otherwise jump fwd/back wouldn't
+        // slide the active row's finish or any downstream chained start.
+        // finish = now + (duration − elapsed); collapses to kickoff + duration
+        // when running, slides correctly when paused.
+        if (kickoffMs !== null) {
+          const playhead = timeset.running ? now : (timeset.lastStop ?? now)
+          const elapsed = playhead - kickoffMs
           if (timer.type === TIMER_TYPES.FINISH_TIME && plannedFinish) {
-            actualFinish = Math.max(plannedFinish, projection, now)
+            actualFinish = Math.max(plannedFinish, kickoffMs, now)
           } else {
-            actualFinish = Math.max(projection + plannedDuration, now)
+            actualFinish = Math.max(now + plannedDuration - elapsed, now)
+          }
+        } else if (actualStart) {
+          if (timer.type === TIMER_TYPES.FINISH_TIME && plannedFinish) {
+            actualFinish = Math.max(plannedFinish, actualStart, now)
+          } else {
+            actualFinish = Math.max(actualStart + plannedDuration, now)
           }
         }
         break

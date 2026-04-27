@@ -169,6 +169,34 @@ describe('createTimestamps', () => {
       expect(ts[1].startDrift).toBe(min(3))
     })
 
+    it('paused + jump fwd: projection slides earlier as the playhead burns through duration', () => {
+      // Operator started 5min late, paused at 1min in, then jumped fwd 2min
+      // while still paused. movePlayhead leaves kickoff alone and shifts
+      // lastStop forward (lastStop = kickoff + 3min). The projection must use
+      // lastStop, not kickoff, or the chain freezes — bug T2-16.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '1'
+      timeset.running = false
+      timeset.kickoff = THREE_PM + min(5) // started 5min late
+      timeset.lastStop = THREE_PM + min(8) // playhead now at 3min in (1 ran, 2 jumped)
+      const memory = {
+        timers: {
+          '1': { start: THREE_PM + min(5), finish: null, elapsed: min(1) },
+        },
+      }
+      const now = THREE_PM + min(6) // 1min after first press, paused since
+      const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
+      // History on the active row: memory.start = +5:00 drift
+      expect(ts[0].actual.start).toBe(THREE_PM + min(5))
+      expect(ts[0].startDrift).toBe(min(5))
+      // Projection: now + duration − (lastStop − kickoff) = 6 + 10 − 3 = 13
+      // (vs the bug: kickoff + duration = 15, frozen against jumps)
+      expect(ts[0].actual.finish).toBe(THREE_PM + min(13))
+      // Downstream chains from the new projection
+      expect(ts[1].actual.start).toBe(THREE_PM + min(13))
+      expect(ts[1].startDrift).toBe(min(3))
+    })
+
     it('after a pause-and-jump, "what time did we actually start" sticks; only the projected finish moves', () => {
       // The original first-press was 5:00 late. Operator paused, jumped 30s
       // forward, resumed — kickoff slid to 5:30 late. The active row's
