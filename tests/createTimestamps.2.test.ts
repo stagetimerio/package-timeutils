@@ -335,6 +335,102 @@ describe('createTimestamps', () => {
 
 
 
+  // Reverse walk: as soon as ANY hard time exists in the rundown (a hard
+  // `startTime`, or FINISH_TIME with `finishTime`), the chain walks BACKWARD
+  // from each downstream anchor to fill in soft `planned.start`/`finish` for
+  // the timers before it. "To land on this anchor, start here."
+  //
+  // Step: prev.finish = next.start; prev.start = prev.finish - prev.duration.
+  // Forward wins on collisions. Walk halts at: top of rundown, FINISH_TIME
+  // without finishTime (variable duration), or another upstream hard
+  // `startTime` (which becomes its own backward anchor).
+  describe('reverse walk: soft starts derived from downstream anchors', () => {
+    // Default case: a single hard startTime on the last row reverse-fills
+    // every earlier soft row.
+    it('hard startTime on last row reverse-fills all earlier rows', () => {
+      timeset.timerId = null
+      timers[2].startTime = new Date(THREE_PM + min(20))
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      // t3: own anchor.
+      expect(ts[2].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[2].planned.finish).toBe(THREE_PM + min(30))
+      // t2: finish = t3.start; start = finish - 10min.
+      expect(ts[1].planned.finish).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      // t1: finish = t2.start; start = finish - 10min.
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
+      expect(ts[0].planned.start).toBe(THREE_PM)
+    })
+
+    // Hard startTime mid-chain: forward radiates downstream, reverse fills
+    // the soft rows upstream of it.
+    it('hard startTime mid-chain: forward downstream, reverse upstream', () => {
+      timeset.timerId = null
+      timers[1].startTime = new Date(THREE_PM + min(15))
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      // Forward from t2.
+      expect(ts[1].planned.start).toBe(THREE_PM + min(15))
+      expect(ts[1].planned.finish).toBe(THREE_PM + min(25))
+      expect(ts[2].planned.start).toBe(THREE_PM + min(25))
+      expect(ts[2].planned.finish).toBe(THREE_PM + min(35))
+      // Reverse fills t1.
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(15))
+      expect(ts[0].planned.start).toBe(THREE_PM + min(5))
+    })
+
+    // Reverse walk halts at an upstream hard startTime — that anchor becomes
+    // its own backward source instead of being overwritten. Earlier rows get
+    // reverse-filled from THAT anchor, not the further-downstream one.
+    it('reverse halts at upstream hard startTime; that anchor seeds its own walk', () => {
+      const fourTimers: TimerInput[] = [
+        makeTimer({ _id: '1' }),
+        makeTimer({ _id: '2', startTime: new Date(THREE_PM + min(20)) }),
+        makeTimer({ _id: '3' }),
+        makeTimer({ _id: '4', startTime: new Date(THREE_PM + min(60)) }),
+      ]
+      timeset.timerId = null
+      const ts = createTimestamps(fourTimers, timeset, undefined, THREE_PM - min(30))
+      // Forward from t2: t2 = 20–30, t3 = 30–40, t4 = own anchor (20-min gap).
+      expect(ts[1].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[2].planned.start).toBe(THREE_PM + min(30))
+      expect(ts[3].planned.start).toBe(THREE_PM + min(60))
+      // Reverse from t4 hits t2 (hard startTime), halts. Reverse from t2
+      // fills t1 — t1.finish = t2.start, t1.start = finish - 10min.
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(20))
+      expect(ts[0].planned.start).toBe(THREE_PM + min(10))
+    })
+
+    // Canonical "set end time" case: FINISH_TIME with finishTime on the
+    // last row anchors planned.finish; the row's configured H/M/S provides
+    // the slot duration the reverse walk subtracts.
+    it('FINISH_TIME-with-finishTime on last row anchors reverse walk', () => {
+      timeset.timerId = null
+      timers[2].type = 'FINISH_TIME'
+      timers[2].finishTime = new Date(THREE_PM + min(30))
+      // t3.minutes = 10 (default).
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      expect(ts[2].planned.finish).toBe(THREE_PM + min(30))
+      expect(ts[2].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.finish).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
+      expect(ts[0].planned.start).toBe(THREE_PM)
+    })
+
+    // Reverse-derived planned values feed the actual chain like any other
+    // planned values: FUTURE timers with no kickoff mirror them, drift = 0.
+    it('reverse-derived planned values flow into actual chain', () => {
+      timeset.timerId = null
+      timers[2].startTime = new Date(THREE_PM + min(20))
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      expect(ts[0].state).toBe('FUTURE')
+      expect(ts[0].actual.start).toBe(THREE_PM)
+      expect(ts[0].actual.finish).toBe(THREE_PM + min(10))
+      expect(ts[0].startDrift).toBe(0)
+      expect(ts[0].finishDrift).toBe(0)
+    })
+  })
+
   describe('timezone + roomDate handling', () => {
     it('applies roomDate to startTime anchored times', () => {
       timers[0].startTime = '2022-01-01T15:00:00.000Z'
