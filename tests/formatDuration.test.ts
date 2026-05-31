@@ -105,6 +105,40 @@ describe('formatDuration', () => {
     })
   })
 
+  describe('maxUnits option', () => {
+    test('caps L_DHMS to the 2 highest-order units', () => {
+      expect(formatDuration(2901452000, { format: 'L_DHMS', maxUnits: 2 })).to.equal('33d 13h')
+    })
+
+    test('caps L_DHMS to a single unit', () => {
+      expect(formatDuration(149459000, { format: 'L_DHMS', maxUnits: 1 })).to.equal('1d')
+    })
+
+    test('keeps trailing zero units when trailingZeros: always', () => {
+      expect(formatDuration(14400000, { format: 'L_DHMS', maxUnits: 2 })).to.equal('4h 0m')
+    })
+
+    test('drops trailing zero units first when paired with trailingZeros: nonzero', () => {
+      expect(formatDuration(14400000, { format: 'L_DHMS', trailingZeros: 'nonzero', maxUnits: 2 })).to.equal('4h')
+    })
+
+    test('caps after trailingZeros pruning (skips middle zeros)', () => {
+      expect(formatDuration(90030000, { format: 'L_DHMS', trailingZeros: 'nonzero', maxUnits: 2 })).to.equal('1d 1h')
+    })
+
+    test('overtime prefix is not counted as a unit', () => {
+      expect(formatDuration(-2901452000, { format: 'L_DHMS', overtimePrefix: '+', maxUnits: 2 })).to.equal('+33d 13h')
+    })
+
+    test('a cap larger than the unit count is a no-op', () => {
+      expect(formatDuration(149459000, { format: 'L_DHMS', maxUnits: 9 })).to.equal('1d 17h 30m 59s')
+    })
+
+    test('maxUnits: 0 means no cap', () => {
+      expect(formatDuration(149459000, { format: 'L_DHMS', maxUnits: 0 })).to.equal('1d 17h 30m 59s')
+    })
+  })
+
   describe('overtimePrefix', () => {
     test('negative with prefix', () => {
       expect(formatDuration(-330000, { overtimePrefix: '+' })).to.equal('+5:30')

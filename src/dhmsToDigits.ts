@@ -14,6 +14,7 @@ const thousands = (num: number): number => Math.floor((num / 1000) % 10)
  * @param  {string} options.overtimePrefix
  * @param  {ZeroDisplay} options.leadingZeros – Controls zero-value components at the high end
  * @param  {ZeroDisplay} options.trailingZeros – Controls zero-value components at the low end
+ * @param  {number} options.maxUnits – Cap output to the N highest-order components still displayed after zero handling
  * @return {(string|number)[]} – The individual digits of the countdown clock
  */
 export function dhmsToDigits (
@@ -23,11 +24,13 @@ export function dhmsToDigits (
     overtimePrefix = '+',
     leadingZeros = 'nonzero' as ZeroDisplay,
     trailingZeros = 'always' as ZeroDisplay,
+    maxUnits,
   }: {
     format?: DurationFormat
     overtimePrefix?: string
     leadingZeros?: ZeroDisplay
     trailingZeros?: ZeroDisplay
+    maxUnits?: number
   } = {},
 ): (string | number)[] {
   const isZero = dhms.days + dhms.hours + dhms.minutes + dhms.seconds === 0
@@ -116,6 +119,18 @@ export function dhmsToDigits (
     } else if (displayHours && displayDays) {
       displayHours = false
     }
+  }
+
+  //
+  // Cap to the N highest-order displayed components
+  //
+
+  if (typeof maxUnits === 'number' && maxUnits > 0) {
+    let kept = 0
+    if (displayDays && ++kept > maxUnits) displayDays = false
+    if (displayHours && ++kept > maxUnits) displayHours = false
+    if (displayMinutes && ++kept > maxUnits) displayMinutes = false
+    if (displaySeconds && ++kept > maxUnits) displaySeconds = false
   }
 
   //
