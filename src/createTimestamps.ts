@@ -8,6 +8,7 @@ import type {
   TimesetInput,
   TimestampState,
   MemoryInput,
+  TargetInput,
   Timestamp,
 } from './types'
 
@@ -83,6 +84,12 @@ const TIMESTAMP_STATE = {
  * - **Strict input shapes.** Callers normalize: `startTime` / `finishTime` are
  *   `Date | null`, `kickoff` etc. are epoch ms. Library does no parsing of
  *   ISO strings or wall-clock formats.
+ * - **`target` is a virtual show-end anchor.** The user-set `target.time`
+ *   (resolved onto roomDate + `target.datePlus`, like any timer anchor) wins
+ *   over the kickoff-frozen `target.frozen`. The resolved instant seeds the
+ *   reverse walk from beyond the last row — trailing soft rows fill backward
+ *   from it ("start here to land on target"). Forward-filled rows win as
+ *   always.
  */
 export function createTimestamps (
   timers: TimerInput[],
@@ -91,6 +98,7 @@ export function createTimestamps (
   now: number = Date.now(),
   roomDate: string | null = null, // 'YYYY-MM-DD'
   memory: MemoryInput = {},
+  target: TargetInput | null = null,
 ): Timestamp[] {
   if (!Array.isArray(timers) || !timers.length) return []
   if (!timeset) return []
@@ -155,22 +163,26 @@ export function createTimestamps (
 
   // --- Pass 2: reverse planned ------------------------------------------
   // Fill remaining null planned rows by walking backward from each downstream
-  // anchor. `target` is the wall we step back from (next row's start).
-  let target: number | null = null
+  // anchor. `wall` is the instant we step back from (next row's start). The
+  // resolved show target end acts as a virtual anchor past the last row.
+  const targetEnd: number | null = target?.time
+    ? resolveAnchoredTime(target.time, iRoomDate, target.datePlus, timezone)
+    : target?.frozen ?? null
+  let wall: number | null = targetEnd
   for (let i = out.length - 1; i >= 0; i--) {
     const row = out[i]!
 
     // Forward already filled this row. Forward wins; row's start is the new
-    // target (an upstream hard anchor seeds its own backward run).
+    // wall (an upstream hard anchor seeds its own backward run).
     if (row.planned.start) {
-      target = row.planned.start
+      wall = row.planned.start
       continue
     }
-    // Reverse-fill from target.
-    if (!target) continue
-    row.planned.finish = target
-    row.planned.start = target - row.planned.duration
-    target = row.planned.start
+    // Reverse-fill from the wall.
+    if (!wall) continue
+    row.planned.finish = wall
+    row.planned.start = wall - row.planned.duration
+    wall = row.planned.start
   }
 
   // --- Pass 3: actual + drift + gap -------------------------------------

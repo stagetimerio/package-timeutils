@@ -486,6 +486,121 @@ describe('createTimestamps', () => {
     })
   })
 
+  // `target` (7th param) is the show-level target end. It seeds the reverse
+  // walk as a virtual anchor past the last row: an otherwise anchor-less
+  // rundown gets back times on every row ("start here to land on target").
+  // Forward-filled rows always win.
+  describe('targetEnd: virtual show-end anchor', () => {
+    it('anchor-less rundown: every row reverse-fills from targetEnd', () => {
+      timeset.timerId = null
+      const targetEnd = THREE_PM + min(30)
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, { frozen: targetEnd })
+      // 3 × 10min back from the target.
+      expect(ts[2].planned.finish).toBe(targetEnd)
+      expect(ts[2].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.finish).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
+      expect(ts[0].planned.start).toBe(THREE_PM)
+    })
+
+    it('null targetEnd: anchor-less rundown keeps honest nulls', () => {
+      timeset.timerId = null
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, null)
+      for (const t of ts) {
+        expect(t.planned.start).toBeNull()
+        expect(t.planned.finish).toBeNull()
+      }
+    })
+
+    it('forward wins: forward-filled rows are not overwritten by targetEnd', () => {
+      timeset.timerId = null
+      timers[0].startTime = new Date(THREE_PM)
+      // Target 15min later than the forward chain's natural end.
+      const targetEnd = THREE_PM + min(45)
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, { frozen: targetEnd })
+      // Forward chain from t1's anchor stands; targetEnd changes nothing.
+      expect(ts[0].planned.start).toBe(THREE_PM)
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      expect(ts[2].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[2].planned.finish).toBe(THREE_PM + min(30))
+    })
+
+    it('hard startTime mid-chain: trailing rows forward-fill, leading rows reverse-fill from the hard anchor, not targetEnd', () => {
+      timeset.timerId = null
+      timers[1].startTime = new Date(THREE_PM + min(15))
+      const targetEnd = THREE_PM + min(60)
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, { frozen: targetEnd })
+      // Forward from t2 fills t2 + t3 — targetEnd cannot touch them.
+      expect(ts[1].planned.start).toBe(THREE_PM + min(15))
+      expect(ts[2].planned.finish).toBe(THREE_PM + min(35))
+      // t1 reverse-fills from t2's hard anchor (nearest downstream wall).
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(15))
+      expect(ts[0].planned.start).toBe(THREE_PM + min(5))
+    })
+
+    it('resolvable over/under: late kickoff in an anchor-less show drifts against the target', () => {
+      // No hard times anywhere; target end frozen at 3PM+30. Show kicks off
+      // 5min behind the back-walked plan — drift is finally non-zero
+      // (against a derived end it was structurally 0).
+      const targetEnd = THREE_PM + min(30)
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(5) // back time said start at THREE_PM
+      const now = THREE_PM + min(6)
+      const ts = createTimestamps(timers, timeset, undefined, now, null, {}, { frozen: targetEnd })
+      expect(ts[0].planned.start).toBe(THREE_PM) // back-walked from target
+      expect(ts[0].startDrift).toBe(min(5))
+      // Projection lands the show 5min past the target.
+      expect(ts[2].planned.finish).toBe(targetEnd)
+      expect(ts[2].actual.finish).toBe(targetEnd + min(5))
+      expect(ts[2].finishDrift).toBe(min(5))
+    })
+
+    it('white target: time + datePlus resolve onto roomDate like timer anchors', () => {
+      timeset.timerId = null
+      // 01:30 wall-clock on roomDate +1d — an overnight show end. The whole
+      // chain back-fills from the resolved instant.
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(30), '2024-06-15', {},
+        { time: new Date('2022-01-01T01:30:00.000Z'), datePlus: 1 })
+      const target = new Date('2024-06-16T01:30:00.000Z').getTime()
+      expect(ts[2].planned.finish).toBe(target)
+      expect(ts[2].planned.start).toBe(target - min(10))
+      expect(ts[1].planned.finish).toBe(target - min(10))
+      expect(ts[1].planned.start).toBe(target - min(20))
+      expect(ts[0].planned.finish).toBe(target - min(20))
+      expect(ts[0].planned.start).toBe(target - min(30))
+    })
+
+    it('white target: datePlus defaults to 0 (target on the room date)', () => {
+      timeset.timerId = null
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(30), '2024-06-15', {},
+        { time: new Date('2022-01-01T18:00:00.000Z') })
+      expect(new Date(ts[2].planned.finish!).toISOString()).toBe('2024-06-15T18:00:00.000Z')
+    })
+
+    it('white time wins over frozen gray', () => {
+      timeset.timerId = null
+      const white = THREE_PM + min(45)
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(30), null, {},
+        { time: new Date(white), frozen: THREE_PM + min(30) })
+      expect(ts[2].planned.finish).toBe(white)
+    })
+
+    it('reverse-derived back times flow into actual chain pre-kickoff (drift 0)', () => {
+      timeset.timerId = null
+      const targetEnd = THREE_PM + min(30)
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, { frozen: targetEnd })
+      for (const t of ts) {
+        expect(t.state).toBe('FUTURE')
+        expect(t.actual.start).toBe(t.planned.start)
+        expect(t.actual.finish).toBe(t.planned.finish)
+        expect(t.startDrift).toBe(0)
+        expect(t.finishDrift).toBe(0)
+      }
+    })
+  })
+
   describe('timezone + roomDate handling', () => {
     it('applies roomDate to startTime anchored times', () => {
       timers[0].startTime = '2022-01-01T15:00:00.000Z'

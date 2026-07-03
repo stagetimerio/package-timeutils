@@ -135,6 +135,20 @@ export interface MemoryInput {
 }
 
 /**
+ * Show target end input for `createTimestamps` — the resolvable goalpost.
+ *
+ * `time` is the user-set ("white") target: a wall-clock Date whose date
+ * portion is ignored and re-placed on roomDate + `datePlus`, exactly like
+ * timer start/finish anchors. `frozen` is the kickoff-frozen derived end
+ * ("gray"), already an epoch-ms instant. `time` wins when both are set.
+ */
+export interface TargetInput {
+  time?: Date | null
+  datePlus?: number
+  frozen?: number | null
+}
+
+/**
  * Per-timer output of `createTimestamps`. All time fields are epoch ms.
  *
  * `planned` and `actual` are two independent chains. `startDrift` and
