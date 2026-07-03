@@ -165,9 +165,7 @@ export function createTimestamps (
   // Fill remaining null planned rows by walking backward from each downstream
   // anchor. `wall` is the instant we step back from (next row's start). The
   // resolved show target end acts as a virtual anchor past the last row.
-  const targetEnd: number | null = target?.time
-    ? resolveAnchoredTime(target.time, iRoomDate, target.datePlus, timezone)
-    : target?.frozen ?? null
+  const targetEnd: number | null = resolveTargetEnd(target, { timezone, now, roomDate })
   let wall: number | null = targetEnd
   for (let i = out.length - 1; i >= 0; i--) {
     const row = out[i]!
@@ -272,6 +270,39 @@ export function createTimestamps (
   }
 
   return out
+}
+
+/**
+ * Resolve the show target end to an epoch-ms instant.
+ *
+ * Same precedence and date placement as `createTimestamps` uses internally
+ * (this IS the function it calls): the user-set ("white") `target.time` is
+ * placed on `roomDate + target.datePlus` in `timezone`, exactly like a timer
+ * anchor, and wins over the kickoff-frozen ("gray") `target.frozen` instant.
+ * Returns `null` when neither is set — the live-derived end is not a fixed
+ * line, so there is nothing to resolve.
+ *
+ * Exported so display layers can compare the same instant the reverse walk
+ * anchors on (e.g. the gap between the last timer's planned finish and the
+ * target) without re-implementing the precedence rules.
+ */
+export function resolveTargetEnd (
+  target: TargetInput | null,
+  {
+    timezone = undefined,
+    now = Date.now(),
+    roomDate = null,
+  }: {
+    timezone?: string
+    now?: number
+    roomDate?: string | null
+  } = {},
+): number | null {
+  if (target?.time) {
+    const iRoomDate = parseCalendarDay(roomDate, { timezone, now: new Date(now) })
+    return resolveAnchoredTime(target.time, iRoomDate, target.datePlus, timezone)
+  }
+  return target?.frozen ?? null
 }
 
 // --- Helpers -------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createTimestamps } from '../src/createTimestamps'
+import { createTimestamps, resolveTargetEnd } from '../src/createTimestamps'
 import type { TimerInput, TimesetInput, MemoryInput } from '../src/types'
 import { parseDateAsToday } from '../src/parseDateAsToday'
 import timestampsFixture1 from './fixtures/timestamps-1-in.json' with { type: 'json' }
@@ -747,5 +747,38 @@ describe('createTimestamps', () => {
         expect(typeof t.planned.start).toBe('number')
       }
     })
+  })
+})
+
+// The exported target resolver — same precedence + date placement the reverse
+// walk uses. Display layers call this to compare against the instant the walk
+// anchored on (e.g. the gap between the last planned finish and the target).
+describe('resolveTargetEnd', () => {
+  it('returns null for no target / empty target', () => {
+    expect(resolveTargetEnd(null)).toBeNull()
+    expect(resolveTargetEnd({})).toBeNull()
+    expect(resolveTargetEnd({ time: null, frozen: null })).toBeNull()
+  })
+
+  it('returns the frozen gray instant as-is', () => {
+    const frozen = THREE_PM + min(30)
+    expect(resolveTargetEnd({ frozen })).toBe(frozen)
+  })
+
+  it('white time wins over frozen and resolves onto roomDate + datePlus', () => {
+    const resolved = resolveTargetEnd(
+      { time: new Date('2022-01-01T01:30:00.000Z'), datePlus: 1, frozen: THREE_PM },
+      { timezone: 'UTC', roomDate: '2024-06-15' },
+    )
+    expect(resolved).toBe(new Date('2024-06-16T01:30:00.000Z').getTime())
+  })
+
+  it('matches the instant createTimestamps anchors the reverse walk on', () => {
+    const timers = makeTimers()
+    const timeset = makeTimeset({ kickoff: null })
+    const target = { time: new Date('2022-01-01T18:00:00.000Z'), datePlus: 0 }
+    const opts = { timezone: 'UTC', now: THREE_PM - min(30), roomDate: '2024-06-15' }
+    const ts = createTimestamps(timers, timeset, opts.timezone, opts.now, opts.roomDate, {}, target)
+    expect(ts[2].planned.finish).toBe(resolveTargetEnd(target, opts))
   })
 })
