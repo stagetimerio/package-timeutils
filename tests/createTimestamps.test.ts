@@ -128,6 +128,51 @@ describe('createTimestamps', () => {
       expect(ts[0].finishDrift).toBe(min(5))
     })
 
+    it('armed/reset first cue (not running, lastStop === kickoff): mirrors planned, no stale projection', () => {
+      // resetTimer parks the playhead at the start: running=false, lastStop ===
+      // kickoff. The kickoff is a reset artifact and `now` is stale. An armed
+      // FIRST cue has no upstream to chain from, so it mirrors planned — a
+      // not-yet-started show must not read late by (now − plannedStart).
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '1'
+      timeset.running = false
+      timeset.kickoff = THREE_PM + min(5) // reset 5min after the planned start
+      timeset.lastStop = THREE_PM + min(5) // === kickoff → armed, never ran
+      timeset.deadline = THREE_PM + min(15)
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(5))
+
+      expect(ts[0].state).toBe('FUTURE') // armed, not live → FUTURE (identity is timeset.timerId's job)
+      expect(ts[0].actual.start).toBe(THREE_PM) // = planned, not the 3:05 kickoff
+      expect(ts[0].actual.finish).toBe(THREE_PM + min(10))
+      expect(ts[0].startDrift).toBe(0)
+      expect(ts[0].finishDrift).toBe(0)
+      expect(ts[1].actual.start).toBe(THREE_PM + min(10)) // downstream stays on plan
+      expect(ts[2].actual.finish).toBe(THREE_PM + min(30))
+    })
+
+    it('armed later cue mid-show (has memory): chains from prev finish — drift carries, no staleness', () => {
+      // Cues 1-2 ran late; the operator armed (reset) cue 3 between cues. The
+      // show is live, so the armed cue chains off cue 2's recorded finish (a
+      // stable fact) rather than snapping back to plan or reading its stale
+      // reset kickoff.
+      timers[0].startTime = new Date(THREE_PM) // anchors the planned chain (3:00/3:10/3:20)
+      timeset.timerId = '3'
+      timeset.running = false
+      timeset.kickoff = THREE_PM + min(99) // reset instant is irrelevant — must NOT be used
+      timeset.lastStop = THREE_PM + min(99) // === kickoff → armed
+      timeset.deadline = THREE_PM + min(109)
+      const memory: MemoryInput = { timers: {
+        '1': { start: THREE_PM, finish: THREE_PM + min(12), elapsed: min(12) },
+        '2': { start: THREE_PM + min(12), finish: THREE_PM + min(25), elapsed: min(13) },
+      } }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(99), null, memory)
+
+      expect(ts[2].state).toBe('FUTURE') // armed mid-show → FUTURE, chains from prior finish
+      expect(ts[2].actual.start).toBe(THREE_PM + min(25)) // = cue 2's recorded finish, not the 99min kickoff
+      expect(ts[2].actual.finish).toBe(THREE_PM + min(35))
+      expect(ts[2].startDrift).toBe(min(5)) // planned 3:20 → actual 3:25
+    })
+
     it('DURATION overrunning: actual.finish = now', () => {
       timers[0].startTime = new Date(THREE_PM)
       timeset.timerId = '1'

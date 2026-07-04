@@ -69,11 +69,17 @@ const TIMESTAMP_STATE = {
  *   was scheduled on purpose. Chaining only kicks in once we've overshot the
  *   anchor (prior row ran long): `actualStart = max(plannedStart, prevActualFinish)`.
  *   No anchor → always chain.
- * - **State is positional, not historical.** `ACTIVE` is the row matching
- *   `timeset.timerId`; `PAST` is everything before it; `FUTURE` is everything
- *   after. Memory says "this timer once ran" — it doesn't tell us where in
- *   the show order the timer sits, so it's irrelevant to state. With no
- *   active timer, every row is FUTURE.
+ * - **State is positional, not historical — with one live exception.** `ACTIVE`
+ *   is the row at `timeset.timerId`; `PAST` is everything before it; `FUTURE`
+ *   everything after. Memory ("this timer once ran") never sets state. The
+ *   exception: an *armed* current cue — one that's merely reset/parked at the
+ *   start (`running === false` and `lastStop === kickoff`) — hasn't started, so
+ *   it is `FUTURE`, not `ACTIVE`. `ACTIVE` therefore means "the current cue,
+ *   and it's live" (running or paused mid-cue). Consumers that need the parked
+ *   cue's identity read `timeset.timerId`, not state. With no active timer (or
+ *   an armed one), no row is ACTIVE. This keeps the stale reset `kickoff` out of
+ *   the projection: a FUTURE armed cue chains from the prior row's finish (or
+ *   mirrors planned when first) instead of reading a frozen snapshot.
  * - **Drift / gap inherit nulls.** `startDrift` / `finishDrift` / `gap` are
  *   `null` when either endpoint of the subtraction is null. `gap` is `0` for
  *   the first row by convention.
@@ -110,6 +116,12 @@ export function createTimestamps (
     ? timers.findIndex(t => String(t._id) === String(timeset.timerId))
     : -1
 
+  // The current cue is "armed" when reset/parked at the very start (not running,
+  // playhead still at kickoff) — not started, so it's FUTURE not ACTIVE (below).
+  const activeIsArmed: boolean = activeIdx >= 0
+    && !timeset.running
+    && timeset.lastStop === kickoffMs
+
   const out: Timestamp[] = []
 
   // --- Pass 1: forward planned + static fields ---------------------------
@@ -122,9 +134,9 @@ export function createTimestamps (
     const hasMemory = !!(mem && mem.finish)
 
     let state: TimestampState
-    if (i === activeIdx) state = TIMESTAMP_STATE.ACTIVE
-    else if (i < activeIdx) state = TIMESTAMP_STATE.PAST
-    else state = TIMESTAMP_STATE.FUTURE
+    if (i < activeIdx) state = TIMESTAMP_STATE.PAST
+    else if (i === activeIdx && !activeIsArmed) state = TIMESTAMP_STATE.ACTIVE
+    else state = TIMESTAMP_STATE.FUTURE // after the active cue, or the active cue while merely armed
 
     let plannedStart: number | null = null
     let plannedFinish: number | null = null
@@ -195,6 +207,9 @@ export function createTimestamps (
     let actualFinish: number | null = plannedFinish
 
     // - actual start
+    // An armed (reset/parked) current cue is FUTURE here — see pass 1 — so it
+    // chains from the previous row's finish (or mirrors planned when first)
+    // instead of projecting off its stale reset kickoff.
     switch (row.state) {
       case TIMESTAMP_STATE.PAST:
         if (mem?.start) actualStart = mem.start
