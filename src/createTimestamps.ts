@@ -96,6 +96,15 @@ const TIMESTAMP_STATE = {
  *   reverse walk from beyond the last row — trailing soft rows fill backward
  *   from it ("start here to land on target"). Forward-filled rows win as
  *   always.
+ * - **`backTime` is backward timing from the target.** Per row, the latest
+ *   start that still lands the show on `targetEnd`, walking the planned chain
+ *   backward through the same durations + gaps. Because every planned row
+ *   satisfies `finish = start + duration` and gaps are the residuals between
+ *   rows, that walk telescopes to a uniform shift:
+ *   `backTime = planned.start + (targetEnd − plannedEnd)` — scheduled gaps
+ *   survive by construction. No fixed target → the plan's own end stands in
+ *   (shift 0, `backTime ≡ planned.start`). Unknown plan end or null
+ *   `planned.start` → `null`.
  */
 export function createTimestamps (
   timers: TimerInput[],
@@ -167,6 +176,7 @@ export function createTimestamps (
       startDrift: null,
       finishDrift: null,
       gap: null,
+      backTime: null,
       hasMemory,
       explicitStart: !!timer.startTime,
       explicitFinish: timer.type === TIMER_TYPES.FINISH_TIME,
@@ -195,7 +205,16 @@ export function createTimestamps (
     wall = row.planned.start
   }
 
-  // --- Pass 3: actual + drift + gap -------------------------------------
+  // Back-time headroom: how far the target sits past the plan's own end.
+  // Timing the plan backward from the target reuses the same durations + gaps,
+  // so per row `backTime = planned.start + headroom` (see the rule above). No
+  // fixed target → the plan end stands in → headroom 0 → backTime ≡ planned.start.
+  const plannedEnd: number | null = out[out.length - 1]!.planned.finish
+  const headroom: number | null = plannedEnd != null
+    ? (targetEnd ?? plannedEnd) - plannedEnd
+    : null
+
+  // --- Pass 3: actual + drift + gap + backTime ---------------------------
   for (const [i, timer] of timers.entries()) {
     const row = out[i]!
     const prev = out[i - 1]
@@ -282,6 +301,7 @@ export function createTimestamps (
     row.gap = plannedStart && prev?.planned.finish
       ? plannedStart - prev.planned.finish
       : i === 0 ? 0 : null
+    row.backTime = headroom != null && plannedStart != null ? plannedStart + headroom : null
   }
 
   return out

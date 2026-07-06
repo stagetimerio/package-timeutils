@@ -201,6 +201,17 @@ export interface Timestamp {
   /** Planned gap before this timer (`planned.start - prev.planned.finish`). `null` when either side is null; `0` for the first. */
   gap: number | null
 
+  /**
+   * Latest start that still lands the show on the target end — the plan timed
+   * backward from `targetEnd` through the same durations + gaps, which reduces
+   * to `planned.start` shifted by the plan-to-target headroom
+   * (`targetEnd - last.planned.finish`). No fixed target → headroom `0` →
+   * `backTime ≡ planned.start`. `null` when `planned.start` or the plan end is
+   * null. `actual.start - backTime` is the cue's over/under against the target
+   * (for the last cue, the show's).
+   */
+  backTime: number | null
+
   /** Timer has a real memory entry (`finish != null`). Orthogonal to `state`. */
   hasMemory: boolean
 

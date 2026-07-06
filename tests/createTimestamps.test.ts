@@ -646,6 +646,82 @@ describe('createTimestamps', () => {
     })
   })
 
+  describe('backTime: must-start-by, timed backward from the target', () => {
+    it('no fixed target: backTime ≡ planned.start (headroom 0)', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      for (const t of ts) {
+        expect(t.backTime).toBe(t.planned.start)
+      }
+    })
+
+    it('target beyond the plan end: every backTime shifts later by the headroom; last cue = target − duration', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      // Plan ends 15:30; target 15:40 → 10min headroom.
+      const targetEnd = THREE_PM + min(40)
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, { frozen: targetEnd })
+      expect(ts[0].backTime).toBe(THREE_PM + min(10))
+      expect(ts[1].backTime).toBe(THREE_PM + min(20))
+      expect(ts[2].backTime).toBe(THREE_PM + min(30))
+      expect(ts[2].backTime).toBe(targetEnd - ts[2].planned.duration)
+    })
+
+    it('target before the plan end: backTime is earlier than planned.start (already overcommitted)', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      // Plan ends 15:30; target 15:25 → −5min headroom.
+      const targetEnd = THREE_PM + min(25)
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, { frozen: targetEnd })
+      expect(ts[0].backTime).toBe(THREE_PM - min(5))
+      expect(ts[2].backTime).toBe(THREE_PM + min(15))
+    })
+
+    it('honors scheduled gaps: the backward timing preserves the plan\'s own breaks', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      timers[1].startTime = new Date(THREE_PM + min(15)) // 5min scheduled gap after t1
+      const targetEnd = THREE_PM + min(45) // plan ends 15:35 → 10min headroom
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, { frozen: targetEnd })
+      // Gap between t1's back-finish and t2's backTime survives the shift.
+      expect(ts[1].backTime! - (ts[0].backTime! + ts[0].planned.duration)).toBe(min(5))
+      expect(ts[1].backTime).toBe(THREE_PM + min(25))
+      expect(ts[2].backTime).toBe(THREE_PM + min(35))
+    })
+
+    it('anchor-less rundown with a target: reverse-filled plan IS the back timing (headroom 0)', () => {
+      timeset.timerId = null
+      const targetEnd = THREE_PM + min(30)
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, { frozen: targetEnd })
+      for (const t of ts) {
+        expect(t.backTime).toBe(t.planned.start)
+      }
+      expect(ts[2].backTime).toBe(targetEnd - min(10))
+    })
+
+    it('honest nulls: no anchors and no target → backTime null everywhere', () => {
+      timeset.timerId = null
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, null)
+      for (const t of ts) {
+        expect(t.backTime).toBeNull()
+      }
+    })
+
+    it('identity: last cue\'s actual.start − backTime = show over/under against the target', () => {
+      // Plan: t1 15:00–15:10, t2/t3 chained to 15:30; target 15:40 (10min headroom).
+      // Show kicks off 15min late → projected 5min over the target.
+      timers[0].startTime = new Date(THREE_PM)
+      const targetEnd = THREE_PM + min(40)
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(15)
+      const now = THREE_PM + min(16)
+      const ts = createTimestamps(timers, timeset, undefined, now, null, {}, { frozen: targetEnd })
+      const last = ts[2]
+      expect(last.actual.finish! - targetEnd).toBe(min(5))
+      expect(last.actual.start! - last.backTime!).toBe(min(5))
+      // …and it differs from finishDrift (vs the plan end) by exactly the headroom.
+      expect(last.finishDrift).toBe(min(15))
+    })
+  })
+
   describe('timezone + roomDate handling', () => {
     it('applies roomDate to startTime anchored times', () => {
       timers[0].startTime = '2022-01-01T15:00:00.000Z'
@@ -786,6 +862,7 @@ describe('createTimestamps', () => {
         expect(t).toHaveProperty('startDrift')
         expect(t).toHaveProperty('finishDrift')
         expect(t).toHaveProperty('gap')
+        expect(t).toHaveProperty('backTime')
         expect(t).toHaveProperty('hasMemory')
         expect(t).toHaveProperty('explicitStart')
         expect(t).toHaveProperty('explicitFinish')
