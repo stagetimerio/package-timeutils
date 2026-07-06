@@ -435,6 +435,52 @@ describe('createTimestamps', () => {
 
 
 
+  // Before the show starts, pointing at a cue is just pointing: nothing has
+  // run, so the earlier rows were never skipped, and the projection must not
+  // change just because the pointer moved.
+  describe('pre-show: pointer position does not fabricate history', () => {
+    it('arming a later cue pre-show: actual mirrors the plan, expected end stays the plan end', () => {
+      // The bug: pre-show (no memory, cue merely armed), arming cue 3 marked
+      // cues 1-2 as skipped-in-zero-seconds and started cue 3's projection at
+      // cue 2's planned start — the expected end read exactly cue 2's
+      // duration short, and jumped around as the pointer moved.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '3'
+      timeset.running = false
+      timeset.kickoff = THREE_PM + min(99) // reset artifact, must not be read
+      timeset.lastStop = THREE_PM + min(99) // === kickoff → armed
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+
+      expect(ts[0].state).toBe('PAST') // state stays positional (list dimming)
+      expect(ts[1].state).toBe('PAST')
+      expect(ts[2].state).toBe('FUTURE') // armed → FUTURE
+      for (const t of ts) {
+        expect(t.actual.start).toBe(t.planned.start)
+        expect(t.actual.finish).toBe(t.planned.finish)
+        expect(t.actual.duration).toBe(t.planned.duration)
+        expect(t.startDrift).toBe(0)
+        expect(t.finishDrift).toBe(0)
+      }
+      // The armed cue projects at its OWN planned start, not cue 2's.
+      expect(ts[2].actual.start).toBe(THREE_PM + min(20))
+      expect(ts[2].actual.finish).toBe(THREE_PM + min(30)) // = plan end
+    })
+
+    it('pre-show projection is invariant under pointer position', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      const arm = (timerId: string | null) => createTimestamps(
+        timers,
+        makeTimeset({ timerId, running: false, kickoff: THREE_PM + min(99), lastStop: THREE_PM + min(99) }),
+        undefined,
+        THREE_PM - min(30),
+      ).map((t) => t.actual)
+      const base = arm(null)
+      expect(arm('1')).toEqual(base)
+      expect(arm('2')).toEqual(base)
+      expect(arm('3')).toEqual(base)
+    })
+  })
+
   // Reverse walk: as soon as ANY hard time exists in the rundown (a hard
   // `startTime`, or FINISH_TIME with `finishTime`), the chain walks BACKWARD
   // from each downstream anchor to fill in soft `planned.start`/`finish` for

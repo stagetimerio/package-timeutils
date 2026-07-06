@@ -80,6 +80,15 @@ const TIMESTAMP_STATE = {
  *   an armed one), no row is ACTIVE. This keeps the stale reset `kickoff` out of
  *   the projection: a FUTURE armed cue chains from the prior row's finish (or
  *   mirrors planned when first) instead of reading a frozen snapshot.
+ * - **Before the show starts, the projection is just the plan.** As long as
+ *   nothing has run yet (no cue is live, no memory of a past run), pointing
+ *   at a cue is just pointing — it doesn't mean the earlier cues were
+ *   skipped. So pre-show, the actual chain ignores which cue is armed and
+ *   projects every row straight from the plan. Without this, arming cue 3
+ *   would treat cues 1-2 as "skipped in zero seconds" and the expected end
+ *   would jump around as the pointer moves. Once the show has started,
+ *   PAST rows without memory really do mean "skipped" and collapse as
+ *   documented. `state` itself is not affected — only the actual chain.
  * - **Drift / gap inherit nulls.** `startDrift` / `finishDrift` / `gap` are
  *   `null` when either endpoint of the subtraction is null. `gap` is `0` for
  *   the first row by convention.
@@ -130,6 +139,14 @@ export function createTimestamps (
   const activeIsArmed: boolean = activeIdx >= 0
     && !timeset.running
     && timeset.lastStop === kickoffMs
+
+  // Has anything run yet? True when a cue is live right now, or memory holds
+  // at least one past run. Memory alone would almost be enough (kickoff
+  // writes an entry), but timeset and memory arrive as separate events — the
+  // first clause covers the moment a cue is already running while its memory
+  // entry hasn't landed yet.
+  const showStarted: boolean = (activeIdx >= 0 && !activeIsArmed)
+    || Object.keys(memory.timers ?? {}).length > 0
 
   const out: Timestamp[] = []
 
@@ -225,11 +242,18 @@ export function createTimestamps (
     let actualStart: number | null = plannedStart
     let actualFinish: number | null = plannedFinish
 
+    // Before the show starts, treat every row as FUTURE here: a row that is
+    // "past" only because of where the pointer sits was never skipped, and
+    // must not collapse to zero duration. (Pre-show there is no live cue and
+    // no memory, so the ACTIVE / PAST-with-memory branches can't apply anyway
+    // — this only disarms the skip-collapse.)
+    const chainState: TimestampState = showStarted ? row.state : TIMESTAMP_STATE.FUTURE
+
     // - actual start
     // An armed (reset/parked) current cue is FUTURE here — see pass 1 — so it
     // chains from the previous row's finish (or mirrors planned when first)
     // instead of projecting off its stale reset kickoff.
-    switch (row.state) {
+    switch (chainState) {
       case TIMESTAMP_STATE.PAST:
         if (mem?.start) actualStart = mem.start
         break
@@ -251,7 +275,7 @@ export function createTimestamps (
     }
 
     // - actual finish
-    switch (row.state) {
+    switch (chainState) {
       case TIMESTAMP_STATE.PAST:
         if (row.hasMemory) actualFinish = mem!.finish!
         else actualFinish = actualStart // skipped: collapse to zero duration
