@@ -29,21 +29,27 @@ const TIMESTAMP_STATE = {
 // --- Main ----------------------------------------------------------------
 
 /**
- * Builds planned + actual timestamp chain for a list of timers.
+ * Builds planned + expected timestamp chain for a list of timers.
  *
  * You give it a rundown — a list of timers, plus what's currently running
  * (`timeset`), the room's date, the timezone, and any memory of past runs.
- * It returns one row per timer with two parallel timelines:
+ * It returns one row per timer with two parallel timelines plus the facts:
  *
  *   - **planned** — when the rundown *says* this timer should start, finish,
  *     and how long it should last. Pure schedule.
- *   - **actual** — when it really started, finished, and ran for. Mixes
- *     recorded history (PAST), live kickoff + clock (ACTIVE), and projection
- *     from the prior row (FUTURE).
+ *   - **expected** — the reality-anchored chain: recorded history (PAST), live
+ *     kickoff + clock (ACTIVE), projection from the prior row (FUTURE). Reality
+ *     where known, projection where not.
+ *   - **memory** — the raw recorded facts for this timer, or `null`. Never a
+ *     guess.
  *
- * Plus a few derived fields per row: `startDrift` / `finishDrift` (actual − planned
- * at each endpoint), `gap` (the planned pause before this row), and flags for
- * how the row should render (`hasMemory`, `explicitStart`, `explicitFinish`).
+ * Plus a few derived fields per row: `startDrift` / `finishDrift` (expected −
+ * planned at each endpoint), `gap` (the planned pause before this row), and
+ * flags for how the row should render (`explicitStart`, `explicitFinish`).
+ *
+ * Consumers should **read memory-first** — `memory.start ?? expected.start`,
+ * same for finish — so facts win wherever they exist and `expected` is only
+ * consulted where it genuinely is a forecast. See `Timestamp` in `./types`.
  *
  * ## Rules
  *
@@ -59,16 +65,17 @@ const TIMESTAMP_STATE = {
  *   anchor).
  * - **Duration defaults to 0.** Durations can never be negative, so `0` is the
  *   honest "don't know" value. Saves null checks at the boundary.
- * - **Actual mirrors planned by default.** When we don't know any better
- *   (no kickoff, no memory, no prev actual to chain from), `actual === planned`
- *   — including null. Kickoff (ACTIVE) and memory (PAST) override this; FUTURE
- *   chains forward from the previous row's `actual.finish` once any timer has
- *   run.
+ * - **Expected mirrors planned by default.** When we don't know any better
+ *   (no kickoff, no memory, no prev expected to chain from), `expected ===
+ *   planned` — including null. Kickoff (ACTIVE) and memory (PAST) override
+ *   this; FUTURE chains forward from the previous row's `expected.finish` once
+ *   any timer has run.
  * - **Hard anchors honor scheduled gaps.** A FUTURE timer with a `startTime`
- *   later than the prior row's actual finish waits at the anchor — the gap
+ *   later than the prior row's expected finish waits at the anchor — the gap
  *   was scheduled on purpose. Chaining only kicks in once we've overshot the
- *   anchor (prior row ran long): `actualStart = max(plannedStart, prevActualFinish)`.
- *   No anchor → always chain.
+ *   anchor (prior row ran long):
+ *   `expectedStart = max(plannedStart, prevExpectedFinish)`. No anchor → always
+ *   chain.
  * - **State is positional, not historical — with one live exception.** `ACTIVE`
  *   is the row at `timeset.timerId`; `PAST` is everything before it; `FUTURE`
  *   everything after. Memory ("this timer once ran") never sets state. The
@@ -83,12 +90,12 @@ const TIMESTAMP_STATE = {
  * - **Before the show starts, the projection is just the plan.** As long as
  *   nothing has run yet (no cue is live, no memory of a past run), pointing
  *   at a cue is just pointing — it doesn't mean the earlier cues were
- *   skipped. So pre-show, the actual chain ignores which cue is armed and
+ *   skipped. So pre-show, the expected chain ignores which cue is armed and
  *   projects every row straight from the plan. Without this, arming cue 3
  *   would treat cues 1-2 as "skipped in zero seconds" and the expected end
  *   would jump around as the pointer moves. Once the show has started,
  *   PAST rows without memory really do mean "skipped" and collapse as
- *   documented. `state` itself is not affected — only the actual chain.
+ *   documented. `state` itself is not affected — only the expected chain.
  * - **Drift / gap inherit nulls.** `startDrift` / `finishDrift` / `gap` are
  *   `null` when either endpoint of the subtraction is null. `gap` is `0` for
  *   the first row by convention.
@@ -152,12 +159,11 @@ export function createTimestamps (
 
   // --- Pass 1: forward planned + static fields ---------------------------
   // Walk the rundown, push a partial Timestamp with `planned` and the fields
-  // that depend only on (timer, timeset): state, hasMemory, explicit flags.
-  // `actual`, drift, and gap are filled in pass 3.
+  // that depend only on (timer, timeset): state, memory, explicit flags.
+  // `expected`, drift, and gap are filled in pass 3.
   for (const [i, timer] of timers.entries()) {
     const prev = out[i - 1]
     const mem = memory.timers?.[String(timer._id)] ?? null
-    const hasMemory = !!(mem && mem.finish)
 
     let state: TimestampState
     if (i < activeIdx) state = TIMESTAMP_STATE.PAST
@@ -189,12 +195,12 @@ export function createTimestamps (
       timerId: timer._id,
       state,
       planned: { start: plannedStart, finish: plannedFinish, duration: plannedDuration },
-      actual: { start: null, finish: null, duration: 0 },
+      expected: { start: null, finish: null, duration: 0 },
+      memory: mem,
       startDrift: null,
       finishDrift: null,
       gap: null,
       backTime: null,
-      hasMemory,
       explicitStart: !!timer.startTime,
       explicitFinish: timer.type === TIMER_TYPES.FINISH_TIME,
     })
@@ -231,16 +237,16 @@ export function createTimestamps (
     ? (targetEnd ?? plannedEnd) - plannedEnd
     : null
 
-  // --- Pass 3: actual + drift + gap + backTime ---------------------------
+  // --- Pass 3: expected + drift + gap + backTime -------------------------
   for (const [i, timer] of timers.entries()) {
     const row = out[i]!
     const prev = out[i - 1]
-    const mem = memory.timers?.[String(timer._id)] ?? null
+    const mem = row.memory
     const { start: plannedStart, finish: plannedFinish, duration: plannedDuration } = row.planned
 
-    // Default: actual mirrors planned.
-    let actualStart: number | null = plannedStart
-    let actualFinish: number | null = plannedFinish
+    // Default: expected mirrors planned.
+    let expectedStart: number | null = plannedStart
+    let expectedFinish: number | null = plannedFinish
 
     // Before the show starts, treat every row as FUTURE here: a row that is
     // "past" only because of where the pointer sits was never skipped, and
@@ -249,36 +255,36 @@ export function createTimestamps (
     // — this only disarms the skip-collapse.)
     const chainState: TimestampState = showStarted ? row.state : TIMESTAMP_STATE.FUTURE
 
-    // - actual start
+    // - expected start
     // An armed (reset/parked) current cue is FUTURE here — see pass 1 — so it
     // chains from the previous row's finish (or mirrors planned when first)
     // instead of projecting off its stale reset kickoff.
     switch (chainState) {
       case TIMESTAMP_STATE.PAST:
-        if (mem?.start) actualStart = mem.start
+        if (mem?.start) expectedStart = mem.start
         break
       case TIMESTAMP_STATE.ACTIVE:
         // Prefer memory.start over kickoff: kickoff drifts with pause/resume/
         // jump cycles, memory.start preserves the original first-kickoff.
-        if (mem?.start) actualStart = mem.start
-        else if (kickoffMs) actualStart = kickoffMs
+        if (mem?.start) expectedStart = mem.start
+        else if (kickoffMs) expectedStart = kickoffMs
         break
       case TIMESTAMP_STATE.FUTURE:
         // Hard `startTime` honors the scheduled gap; chain forward only if
         // we've already overshot the anchor. Otherwise chain from prev.
         if (timer.startTime && plannedStart) {
-          actualStart = prev?.actual.finish ? Math.max(plannedStart, prev.actual.finish) : plannedStart
-        } else if (prev?.actual.finish) {
-          actualStart = prev.actual.finish
+          expectedStart = prev?.expected.finish ? Math.max(plannedStart, prev.expected.finish) : plannedStart
+        } else if (prev?.expected.finish) {
+          expectedStart = prev.expected.finish
         }
         break
     }
 
-    // - actual finish
+    // - expected finish
     switch (chainState) {
       case TIMESTAMP_STATE.PAST:
-        if (row.hasMemory) actualFinish = mem!.finish!
-        else actualFinish = actualStart // skipped: collapse to zero duration
+        if (mem?.finish) expectedFinish = mem.finish
+        else expectedFinish = expectedStart // skipped: collapse to zero duration
         break
       case TIMESTAMP_STATE.ACTIVE: {
         // Project from the live playhead.
@@ -293,35 +299,35 @@ export function createTimestamps (
           const playhead = timeset.running ? now : (timeset.lastStop ?? now)
           const elapsed = playhead - kickoffMs
           if (timer.type === TIMER_TYPES.FINISH_TIME && plannedFinish) {
-            actualFinish = Math.max(plannedFinish, kickoffMs, now)
+            expectedFinish = Math.max(plannedFinish, kickoffMs, now)
           } else {
-            actualFinish = Math.max(now + plannedDuration - elapsed, now)
+            expectedFinish = Math.max(now + plannedDuration - elapsed, now)
           }
-        } else if (actualStart) {
+        } else if (expectedStart) {
           if (timer.type === TIMER_TYPES.FINISH_TIME && plannedFinish) {
-            actualFinish = Math.max(plannedFinish, actualStart, now)
+            expectedFinish = Math.max(plannedFinish, expectedStart, now)
           } else {
-            actualFinish = Math.max(actualStart + plannedDuration, now)
+            expectedFinish = Math.max(expectedStart + plannedDuration, now)
           }
         }
         break
       }
       case TIMESTAMP_STATE.FUTURE:
-        if (actualStart) {
+        if (expectedStart) {
           if (timer.type === TIMER_TYPES.FINISH_TIME) {
-            actualFinish = Math.max(plannedFinish ?? actualStart, actualStart)
+            expectedFinish = Math.max(plannedFinish ?? expectedStart, expectedStart)
           } else {
-            actualFinish = actualStart + plannedDuration
+            expectedFinish = expectedStart + plannedDuration
           }
         }
         break
     }
 
-    const actualDuration = actualStart && actualFinish ? Math.max(0, actualFinish - actualStart) : 0
+    const expectedDuration = expectedStart && expectedFinish ? Math.max(0, expectedFinish - expectedStart) : 0
 
-    row.actual = { start: actualStart, finish: actualFinish, duration: actualDuration }
-    row.startDrift = actualStart && plannedStart ? actualStart - plannedStart : null
-    row.finishDrift = actualFinish && plannedFinish ? actualFinish - plannedFinish : null
+    row.expected = { start: expectedStart, finish: expectedFinish, duration: expectedDuration }
+    row.startDrift = expectedStart && plannedStart ? expectedStart - plannedStart : null
+    row.finishDrift = expectedFinish && plannedFinish ? expectedFinish - plannedFinish : null
     row.gap = plannedStart && prev?.planned.finish
       ? plannedStart - prev.planned.finish
       : i === 0 ? 0 : null

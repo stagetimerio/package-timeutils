@@ -58,14 +58,15 @@ export type TimerTrigger = 'MANUAL' | 'LINKED' | 'SCHEDULED'
 
 /**
  * Purely positional, relative to the active timer in the list:
- *   - `ACTIVE` — `timeset.timerId` matches this timer
+ *   - `ACTIVE` — `timeset.timerId` matches this timer, and it's live
  *   - `PAST`   — index is before the active timer
- *   - `FUTURE` — index is after the active timer
+ *   - `FUTURE` — index is after the active timer, or the active cue while
+ *                merely armed (reset/parked at the start — not started yet)
  *
- * Fallback when no timer is active: `PAST` iff the timer has memory, else
- * `FUTURE`. Memory presence is carried separately by `hasMemory`, so a PAST
- * timer without memory (skipped) and a FUTURE timer with memory (jumped
- * back from) are both valid and meaningful.
+ * With no active timer, every row is `FUTURE`. Memory never sets state, so a
+ * PAST timer without memory (skipped) and a FUTURE timer with memory (jumped
+ * back from) are both valid and meaningful. Memory is carried separately by
+ * `memory`.
  */
 export type TimestampState = 'PAST' | 'ACTIVE' | 'FUTURE'
 
@@ -114,9 +115,10 @@ export interface TimesetInput {
  *       countdown resumes from. NOT equal to `finish - start` when the timer
  *       was paused during its run.
  *
- * `createTimestamps` reads `start`/`finish` for the schedule layer. `elapsed`
- * is for the caller's resume logic — don't derive `actual.duration` from it;
- * use `finish - start` to keep wall-clock identity.
+ * `createTimestamps` reads `start`/`finish` for the schedule layer and passes
+ * the whole entry through as `Timestamp.memory`. `elapsed` is for the caller's
+ * resume logic — don't derive `expected.duration` from it; use
+ * `finish - start` to keep wall-clock identity.
  *
  * Drift baselines are NOT pinned via memory snapshots. Planned values are
  * computed live from current timer config; user-placed hard-time anchors
@@ -151,15 +153,37 @@ export interface TargetInput {
 /**
  * Per-timer output of `createTimestamps`. All time fields are epoch ms.
  *
- * `planned` and `actual` are two independent chains. `startDrift` and
- * `finishDrift` are the schedule delta measured at the two endpoints of the
- * same timer — drift entering and drift exiting. Both quantised to 500ms and
- * bidirectional (negative = ahead of schedule).
+ * ## Three channels: `planned`, `expected`, `memory`
  *
- * Event-level totals read from the endpoints — the actual chain already
+ * - **`planned`** — pure schedule. What the rundown says.
+ * - **`expected`** — the reality-anchored chain: reality where known,
+ *   projection where not. Passes *through* facts, so for a settled row it
+ *   equals `memory` by construction.
+ * - **`memory`** — raw recorded facts, or `null`. Never a guess.
+ *
+ * **Read memory-first.** Take `memory.start` / `memory.finish` when non-null
+ * and fall back to the `expected.*` counterpart. Then the name is true at the
+ * point of use: you only touch `expected.*` when no fact exists for that
+ * field, which is exactly when it *is* a forecast. This resolves the hybrid
+ * per field with no `state` check — an ACTIVE row yields a fact start
+ * (`memory.start`) and a projected finish (`expected.finish`), which is the
+ * honest reading. Display rule falls out of it: facts render solid, forecasts
+ * italic, and a guess can never masquerade as a fact.
+ *
+ * Don't infer settledness from `memory !== null`: it means "this ran before,
+ * at least partly", not "this is finished". A resumed cue has
+ * `memory.finish` from its *last* stop while its live finish is still a
+ * projection. Per-field memory-first handles this; a row-level "is it a fact"
+ * flag cannot.
+ *
+ * `startDrift` and `finishDrift` are the schedule delta measured at the two
+ * endpoints of the same timer — drift entering and drift exiting. Both
+ * quantised to 500ms and bidirectional (negative = ahead of schedule).
+ *
+ * Event-level totals read from the endpoints — the expected chain already
  * carries accumulated deviation forward, so summing would double-count:
- *   eventActualFinish = last.actual.finish
- *   eventFinishDrift  = last.finishDrift
+ *   eventExpectedFinish = last.expected.finish
+ *   eventFinishDrift    = last.finishDrift
  *
  * On back-to-back chains `startDrift[i+1] === finishDrift[i]`; a scheduled gap
  * or a previous under-run resets startDrift to 0 at the boundary (unless
@@ -167,14 +191,14 @@ export interface TargetInput {
  * `finishDrift` to 0 until drift exceeds the slot.
  *
  * The timer's own variance (over- or under-run vs its planned duration) is
- * `finishDrift - startDrift`, which equals `actual.duration - planned.duration`.
+ * `finishDrift - startDrift`, which equals `expected.duration - planned.duration`.
  * Not exposed as a field — compute at call sites if needed.
  */
 export interface Timestamp {
   /** Timer's `_id`, passed through from input. */
   timerId: string
 
-  /** Positional label (see `TimestampState`). Orthogonal to `hasMemory`. */
+  /** Positional label (see `TimestampState`). Orthogonal to `memory`. */
   state: TimestampState
 
   /**
@@ -186,16 +210,31 @@ export interface Timestamp {
   planned: { start: number | null, finish: number | null, duration: number }
 
   /**
-   * Realised times: memory for PAST, kickoff+live for ACTIVE, projected for
-   * FUTURE. Falls back to `planned` when nothing better is known — so `actual`
-   * inherits `null` when planned is null.
+   * The reality-anchored chain: memory for PAST, kickoff + live clock for
+   * ACTIVE, projected from the prior row for FUTURE. Falls back to `planned`
+   * when nothing better is known — so `expected` inherits `null` when planned
+   * is null.
+   *
+   * Passes through facts rather than excluding them, so a settled row's
+   * `expected` equals its `memory`. Read memory-first (see above) and this is
+   * only ever consulted where it genuinely is a forecast.
    */
-  actual: { start: number | null, finish: number | null, duration: number }
+  expected: { start: number | null, finish: number | null, duration: number }
 
-  /** `actual.start - planned.start`. `null` when either side is null. */
+  /**
+   * Raw memory passthrough — recorded facts for this timer, or `null` when it
+   * has never run. Fields are independently nullable: `start` without `finish`
+   * is a cue that started and hasn't stopped.
+   *
+   * This is the fact channel. Facts render from here; forecasts render from
+   * `expected`. Consumers never need to cross-read a memory store.
+   */
+  memory: MemoryTimerEntry | null
+
+  /** `expected.start - planned.start`. `null` when either side is null. */
   startDrift: number | null
 
-  /** `actual.finish - planned.finish`. `null` when either side is null. */
+  /** `expected.finish - planned.finish`. `null` when either side is null. */
   finishDrift: number | null
 
   /** Planned gap before this timer (`planned.start - prev.planned.finish`). `null` when either side is null; `0` for the first. */
@@ -207,13 +246,10 @@ export interface Timestamp {
    * to `planned.start` shifted by the plan-to-target headroom
    * (`targetEnd - last.planned.finish`). No fixed target → headroom `0` →
    * `backTime ≡ planned.start`. `null` when `planned.start` or the plan end is
-   * null. `actual.start - backTime` is the cue's over/under against the target
-   * (for the last cue, the show's).
+   * null. `expected.start - backTime` is the cue's over/under against the
+   * target (for the last cue, the show's).
    */
   backTime: number | null
-
-  /** Timer has a real memory entry (`finish != null`). Orthogonal to `state`. */
-  hasMemory: boolean
 
   /** Timer has a `startTime` anchor — render separately, and a preceding `gap` is a scheduled pause. */
   explicitStart: boolean

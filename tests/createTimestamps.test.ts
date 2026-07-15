@@ -70,16 +70,16 @@ describe('createTimestamps', () => {
       expect(ts[2].planned.finish).toBe(THREE_PM + min(30))
     })
 
-    it('all FUTURE timers with no kickoff: actual mirrors planned, drift = 0', () => {
+    it('all FUTURE timers with no kickoff: expected mirrors planned, drift = 0', () => {
       timers[0].startTime = new Date(THREE_PM)
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
       for (const t of ts) {
         expect(t.state).toBe('FUTURE')
-        expect(t.actual.start).toBe(t.planned.start)
-        expect(t.actual.finish).toBe(t.planned.finish)
+        expect(t.expected.start).toBe(t.planned.start)
+        expect(t.expected.finish).toBe(t.planned.finish)
         expect(t.startDrift).toBe(0)
         expect(t.finishDrift).toBe(0)
-        expect(t.hasMemory).toBe(false)
+        expect(t.memory).toBe(null)
       }
     })
 
@@ -113,7 +113,7 @@ describe('createTimestamps', () => {
   })
 
   describe('ACTIVE timer', () => {
-    it('DURATION: actual.start = kickoff, drift = kickoff - planned.start', () => {
+    it('DURATION: expected.start = kickoff, drift = kickoff - planned.start', () => {
       timers[0].startTime = new Date(THREE_PM)
       timeset.timerId = '1'
       timeset.running = true
@@ -121,9 +121,9 @@ describe('createTimestamps', () => {
       timeset.deadline = THREE_PM + min(15)
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(5))
       expect(ts[0].state).toBe('ACTIVE')
-      expect(ts[0].actual.start).toBe(THREE_PM + min(5))
-      expect(ts[0].actual.duration).toBe(min(10))
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(15))
+      expect(ts[0].expected.start).toBe(THREE_PM + min(5))
+      expect(ts[0].expected.duration).toBe(min(10))
+      expect(ts[0].expected.finish).toBe(THREE_PM + min(15))
       expect(ts[0].startDrift).toBe(min(5))
       expect(ts[0].finishDrift).toBe(min(5))
     })
@@ -142,12 +142,12 @@ describe('createTimestamps', () => {
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(5))
 
       expect(ts[0].state).toBe('FUTURE') // armed, not live → FUTURE (identity is timeset.timerId's job)
-      expect(ts[0].actual.start).toBe(THREE_PM) // = planned, not the 3:05 kickoff
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(10))
+      expect(ts[0].expected.start).toBe(THREE_PM) // = planned, not the 3:05 kickoff
+      expect(ts[0].expected.finish).toBe(THREE_PM + min(10))
       expect(ts[0].startDrift).toBe(0)
       expect(ts[0].finishDrift).toBe(0)
-      expect(ts[1].actual.start).toBe(THREE_PM + min(10)) // downstream stays on plan
-      expect(ts[2].actual.finish).toBe(THREE_PM + min(30))
+      expect(ts[1].expected.start).toBe(THREE_PM + min(10)) // downstream stays on plan
+      expect(ts[2].expected.finish).toBe(THREE_PM + min(30))
     })
 
     it('armed later cue mid-show (has memory): chains from prev finish — drift carries, no staleness', () => {
@@ -168,19 +168,19 @@ describe('createTimestamps', () => {
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(99), null, memory)
 
       expect(ts[2].state).toBe('FUTURE') // armed mid-show → FUTURE, chains from prior finish
-      expect(ts[2].actual.start).toBe(THREE_PM + min(25)) // = cue 2's recorded finish, not the 99min kickoff
-      expect(ts[2].actual.finish).toBe(THREE_PM + min(35))
-      expect(ts[2].startDrift).toBe(min(5)) // planned 3:20 → actual 3:25
+      expect(ts[2].expected.start).toBe(THREE_PM + min(25)) // = cue 2's recorded finish, not the 99min kickoff
+      expect(ts[2].expected.finish).toBe(THREE_PM + min(35))
+      expect(ts[2].startDrift).toBe(min(5)) // planned 3:20 → expected 3:25
     })
 
-    it('DURATION overrunning: actual.finish = now', () => {
+    it('DURATION overrunning: expected.finish = now', () => {
       timers[0].startTime = new Date(THREE_PM)
       timeset.timerId = '1'
       timeset.running = true
       timeset.kickoff = THREE_PM
       const now = THREE_PM + min(12) // 2min overrun
       const ts = createTimestamps(timers, timeset, undefined, now)
-      expect(ts[0].actual.finish).toBe(now)
+      expect(ts[0].expected.finish).toBe(now)
       expect(ts[0].finishDrift).toBe(min(2))
     })
 
@@ -191,11 +191,11 @@ describe('createTimestamps', () => {
       timeset.kickoff = THREE_PM + min(5) // 5min late
       const now = THREE_PM + min(7)
       const ts = createTimestamps(timers, timeset, undefined, now)
-      // t1 actual: start=5, duration=10, finish=15
+      // t1 expected: start=5, duration=10, finish=15
       // t2 planned.start = prev.planned.finish = THREE_PM + 10
-      // t2 actual.start (non-linked) = max(prev.actual.finish=15, planned.start=10) = 15
+      // t2 expected.start (non-linked) = max(prev.expected.finish=15, planned.start=10) = 15
       expect(ts[1].planned.start).toBe(THREE_PM + min(10))
-      expect(ts[1].actual.start).toBe(THREE_PM + min(15))
+      expect(ts[1].expected.start).toBe(THREE_PM + min(15))
       expect(ts[1].startDrift).toBe(min(5))
     })
 
@@ -207,10 +207,10 @@ describe('createTimestamps', () => {
       timeset.kickoff = THREE_PM + min(8) // 8min late
       const now = THREE_PM + min(10)
       const ts = createTimestamps(timers, timeset, undefined, now)
-      // t1 actual: start=8, duration=10, finish=18
-      // t2 planned.start = THREE_PM + 15. actual.start = max(18, 15) = 18
+      // t1 expected: start=8, duration=10, finish=18
+      // t2 planned.start = THREE_PM + 15. expected.start = max(18, 15) = 18
       // drift = 18 - 15 = 3min (gap of 5min absorbed 5 of 8 min drift)
-      expect(ts[1].actual.start).toBe(THREE_PM + min(18))
+      expect(ts[1].expected.start).toBe(THREE_PM + min(18))
       expect(ts[1].startDrift).toBe(min(3))
     })
 
@@ -232,13 +232,13 @@ describe('createTimestamps', () => {
       const now = THREE_PM + min(6) // 1min after first press, paused since
       const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
       // History on the active row: memory.start = +5:00 drift
-      expect(ts[0].actual.start).toBe(THREE_PM + min(5))
+      expect(ts[0].expected.start).toBe(THREE_PM + min(5))
       expect(ts[0].startDrift).toBe(min(5))
       // Projection: now + duration − (lastStop − kickoff) = 6 + 10 − 3 = 13
       // (vs the bug: kickoff + duration = 15, frozen against jumps)
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(13))
+      expect(ts[0].expected.finish).toBe(THREE_PM + min(13))
       // Downstream chains from the new projection
-      expect(ts[1].actual.start).toBe(THREE_PM + min(13))
+      expect(ts[1].expected.start).toBe(THREE_PM + min(13))
       expect(ts[1].startDrift).toBe(min(3))
     })
 
@@ -260,20 +260,20 @@ describe('createTimestamps', () => {
       const now = THREE_PM + min(7)
       const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
       // History on the active row: memory.start, +5:00 drift
-      expect(ts[0].actual.start).toBe(THREE_PM + min(5))
+      expect(ts[0].expected.start).toBe(THREE_PM + min(5))
       expect(ts[0].startDrift).toBe(min(5))
       // Projection on the active row: kickoff + duration, +5:30 drift
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(15) + 30_000)
+      expect(ts[0].expected.finish).toBe(THREE_PM + min(15) + 30_000)
       expect(ts[0].finishDrift).toBe(min(5) + 30_000)
       // Downstream chains from the projection, not the history
-      expect(ts[1].actual.start).toBe(THREE_PM + min(15) + 30_000)
+      expect(ts[1].expected.start).toBe(THREE_PM + min(15) + 30_000)
       expect(ts[1].startDrift).toBe(min(5) + 30_000)
     })
 
   })
 
-  describe('FINISH_TIME anchoring in actual chain', () => {
-    it('FUTURE FINISH_TIME absorbs drift up to duration, actual.finish stays = planned.finish', () => {
+  describe('FINISH_TIME anchoring in expected chain', () => {
+    it('FUTURE FINISH_TIME absorbs drift up to duration, expected.finish stays = planned.finish', () => {
       timers[0].startTime = new Date(THREE_PM)
       timers[1].type = 'FINISH_TIME'
       timers[1].finishTime = new Date(THREE_PM + min(25)) // t2: 10-25 planned (15 min duration)
@@ -282,12 +282,12 @@ describe('createTimestamps', () => {
       timeset.kickoff = THREE_PM + min(10) // 10min late
       const now = THREE_PM + min(11)
       const ts = createTimestamps(timers, timeset, undefined, now)
-      // t1 actual: 10-20. t2 actual.start = max(t1.finish, t1.planned.finish) = max(20, 10) = 20
-      // t2 actual.finish = max(planned.finish=25, actual.start=20) = 25
-      // t2 actual.duration = 25 - 20 = 5 (absorbed 10min from 15min)
-      expect(ts[1].actual.start).toBe(THREE_PM + min(20))
-      expect(ts[1].actual.finish).toBe(THREE_PM + min(25))
-      expect(ts[1].actual.duration).toBe(min(5))
+      // t1 expected: 10-20. t2 expected.start = max(t1.finish, t1.planned.finish) = max(20, 10) = 20
+      // t2 expected.finish = max(planned.finish=25, expected.start=20) = 25
+      // t2 expected.duration = 25 - 20 = 5 (absorbed 10min from 15min)
+      expect(ts[1].expected.start).toBe(THREE_PM + min(20))
+      expect(ts[1].expected.finish).toBe(THREE_PM + min(25))
+      expect(ts[1].expected.duration).toBe(min(5))
       expect(ts[1].finishDrift).toBe(0) // finish didn't shift
     })
 
@@ -300,18 +300,18 @@ describe('createTimestamps', () => {
       timeset.kickoff = THREE_PM + min(10) // 10min late (more than t2's duration)
       const now = THREE_PM + min(11)
       const ts = createTimestamps(timers, timeset, undefined, now)
-      // t1 actual: 10-20. t2 actual.start = max(20, 10) = 20
-      // t2 actual.finish = max(planned=15, actual.start=20) = 20
-      // t2 actual.duration = max(0, 20-20) = 0 (clamped)
-      expect(ts[1].actual.start).toBe(THREE_PM + min(20))
-      expect(ts[1].actual.finish).toBe(THREE_PM + min(20))
-      expect(ts[1].actual.duration).toBe(0)
+      // t1 expected: 10-20. t2 expected.start = max(20, 10) = 20
+      // t2 expected.finish = max(planned=15, expected.start=20) = 20
+      // t2 expected.duration = max(0, 20-20) = 0 (clamped)
+      expect(ts[1].expected.start).toBe(THREE_PM + min(20))
+      expect(ts[1].expected.finish).toBe(THREE_PM + min(20))
+      expect(ts[1].expected.duration).toBe(0)
       expect(ts[1].finishDrift).toBe(min(5)) // overflow drift propagates
     })
   })
 
   describe('PAST with memory', () => {
-    it('populates actual from memory entry, drift based on planned', () => {
+    it('populates expected from memory entry, drift based on planned', () => {
       timers[0].startTime = new Date(THREE_PM)
       timers[1].startTime = new Date(THREE_PM + min(10))
       timeset.timerId = '2'
@@ -325,16 +325,17 @@ describe('createTimestamps', () => {
       const now = THREE_PM + min(13)
       const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
       expect(ts[0].state).toBe('PAST')
-      expect(ts[0].hasMemory).toBe(true)
-      expect(ts[0].actual.start).toBe(THREE_PM + min(2))
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(12))
-      expect(ts[0].actual.duration).toBe(min(10))
+      // Settled row: `expected` passes through the facts, so it equals `memory`.
+      expect(ts[0].memory).toEqual({ start: THREE_PM + min(2), finish: THREE_PM + min(12), elapsed: min(10) })
+      expect(ts[0].expected.start).toBe(THREE_PM + min(2))
+      expect(ts[0].expected.finish).toBe(THREE_PM + min(12))
+      expect(ts[0].expected.duration).toBe(min(10))
       expect(ts[0].startDrift).toBe(min(2))
     })
 
     it('skipped PAST (positionally past, no memory) chains from prev, drift = 0', () => {
       // Active is timer 3, timer 1 and 2 have no memory entries (skipped).
-      // State is positional → t1 and t2 are PAST; hasMemory flags them as unrun.
+      // State is positional → t1 and t2 are PAST; null memory flags them as unrun.
       timers[0].startTime = new Date(THREE_PM)
       timeset.timerId = '3'
       timeset.running = true
@@ -346,9 +347,9 @@ describe('createTimestamps', () => {
       }
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(6), null, memory)
       expect(ts[0].state).toBe('PAST')
-      expect(ts[0].hasMemory).toBe(false)
+      expect(ts[0].memory).toBe(null)
       expect(ts[1].state).toBe('PAST')
-      expect(ts[1].hasMemory).toBe(false)
+      expect(ts[1].memory).toBe(null)
       expect(ts[0].startDrift).toBe(0)
       expect(ts[1].startDrift).toBe(0)
       expect(ts[2].state).toBe('ACTIVE')
@@ -371,22 +372,24 @@ describe('createTimestamps', () => {
       }
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(31), null, memory)
 
-      // B — FUTURE, hasMemory flag preserved but actual comes from projection
+      // B — FUTURE. The two channels diverge here: `memory` still holds the
+      // prior pass's facts, while `expected` projects the *next* run. This is
+      // exactly why settledness can't be read off `memory !== null`.
       expect(ts[1].state).toBe('FUTURE')
-      expect(ts[1].hasMemory).toBe(true)
+      expect(ts[1].memory).toEqual({ start: THREE_PM + min(10), finish: THREE_PM + min(20), elapsed: min(10) })
       // Projects from active A: kickoff 3:30 + 10min = 3:40
-      expect(ts[1].actual.start).toBe(THREE_PM + min(40))
-      expect(ts[1].actual.finish).toBe(THREE_PM + min(50))
-      expect(ts[1].actual.duration).toBe(min(10))
+      expect(ts[1].expected.start).toBe(THREE_PM + min(40))
+      expect(ts[1].expected.finish).toBe(THREE_PM + min(50))
+      expect(ts[1].expected.duration).toBe(min(10))
 
       // C — FUTURE, same treatment
       expect(ts[2].state).toBe('FUTURE')
-      expect(ts[2].hasMemory).toBe(true)
-      expect(ts[2].actual.start).toBe(THREE_PM + min(50))
-      expect(ts[2].actual.finish).toBe(THREE_PM + min(60))
+      expect(ts[2].memory?.finish).toBe(THREE_PM + min(30))
+      expect(ts[2].expected.start).toBe(THREE_PM + min(50))
+      expect(ts[2].expected.finish).toBe(THREE_PM + min(60))
     })
 
-    it('paused PAST timer: actual.duration is wall-clock (finish - start), not elapsed', () => {
+    it('paused PAST timer: expected.duration is wall-clock (finish - start), not elapsed', () => {
       // Timer A kicked off at 3:00, ran 3 min, paused, transitioned at 3:20.
       // memory.elapsed = 3 min (resume layer) but wall-clock occupancy = 20 min.
       // Schedule layer must reflect the 20-min slot; elapsed stays in memory
@@ -402,11 +405,36 @@ describe('createTimestamps', () => {
       }
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(21), null, memory)
       expect(ts[0].state).toBe('PAST')
-      expect(ts[0].hasMemory).toBe(true)
-      expect(ts[0].actual.start).toBe(THREE_PM)
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(20))
-      expect(ts[0].actual.duration).toBe(min(20)) // wall-clock, NOT elapsed (3min)
+      expect(ts[0].memory?.elapsed).toBe(min(3)) // resume layer, untouched by the schedule layer
+      expect(ts[0].expected.start).toBe(THREE_PM)
+      expect(ts[0].expected.finish).toBe(THREE_PM + min(20))
+      expect(ts[0].expected.duration).toBe(min(20)) // wall-clock, NOT elapsed (3min)
       expect(ts[0].finishDrift).toBe(min(10)) // planned was 10min, slot took 20min
+    })
+
+    it('ACTIVE cue: memory carries the fact start, expected carries the projected finish', () => {
+      // The hybrid row. Memory-first per field is the whole point: a consumer
+      // reads `memory.start` (a fact — it really started at 3:02) and falls
+      // through to `expected.finish` (a projection — it hasn't stopped yet),
+      // with no `state` check. A row-level "is this settled" flag can't express
+      // this, which is why the old `hasMemory` boolean is gone.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(2)
+      const memory: MemoryInput = {
+        timers: {
+          '1': { start: THREE_PM + min(2), finish: null, elapsed: 0 },
+        },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(5), null, memory)
+      expect(ts[0].state).toBe('ACTIVE')
+      // Fact: started, not stopped.
+      expect(ts[0].memory?.start).toBe(THREE_PM + min(2))
+      expect(ts[0].memory?.finish).toBe(null)
+      // Forecast: 10min duration from a 3:02 kickoff → 3:12.
+      expect(ts[0].expected.start).toBe(THREE_PM + min(2))
+      expect(ts[0].expected.finish).toBe(THREE_PM + min(12))
     })
 
     it('live duration edit on past timer shifts startDrift / finishDrift', () => {
@@ -428,7 +456,7 @@ describe('createTimestamps', () => {
       // planned.start anchored to THREE_PM, planned.finish = THREE_PM + 20min (live)
       expect(ts[0].planned.finish).toBe(THREE_PM + min(20))
       expect(ts[0].startDrift).toBe(min(2))
-      // finishDrift = actual.finish (3PM+13) - planned.finish (3PM+20) = -7min
+      // finishDrift = expected.finish (3PM+13) - planned.finish (3PM+20) = -7min
       expect(ts[0].finishDrift).toBe(-min(7))
     })
   })
@@ -439,7 +467,7 @@ describe('createTimestamps', () => {
   // run, so the earlier rows were never skipped, and the projection must not
   // change just because the pointer moved.
   describe('pre-show: pointer position does not fabricate history', () => {
-    it('arming a later cue pre-show: actual mirrors the plan, expected end stays the plan end', () => {
+    it('arming a later cue pre-show: expected mirrors the plan, expected end stays the plan end', () => {
       // The bug: pre-show (no memory, cue merely armed), arming cue 3 marked
       // cues 1-2 as skipped-in-zero-seconds and started cue 3's projection at
       // cue 2's planned start — the expected end read exactly cue 2's
@@ -455,15 +483,15 @@ describe('createTimestamps', () => {
       expect(ts[1].state).toBe('PAST')
       expect(ts[2].state).toBe('FUTURE') // armed → FUTURE
       for (const t of ts) {
-        expect(t.actual.start).toBe(t.planned.start)
-        expect(t.actual.finish).toBe(t.planned.finish)
-        expect(t.actual.duration).toBe(t.planned.duration)
+        expect(t.expected.start).toBe(t.planned.start)
+        expect(t.expected.finish).toBe(t.planned.finish)
+        expect(t.expected.duration).toBe(t.planned.duration)
         expect(t.startDrift).toBe(0)
         expect(t.finishDrift).toBe(0)
       }
       // The armed cue projects at its OWN planned start, not cue 2's.
-      expect(ts[2].actual.start).toBe(THREE_PM + min(20))
-      expect(ts[2].actual.finish).toBe(THREE_PM + min(30)) // = plan end
+      expect(ts[2].expected.start).toBe(THREE_PM + min(20))
+      expect(ts[2].expected.finish).toBe(THREE_PM + min(30)) // = plan end
     })
 
     it('pre-show projection is invariant under pointer position', () => {
@@ -473,7 +501,7 @@ describe('createTimestamps', () => {
         makeTimeset({ timerId, running: false, kickoff: THREE_PM + min(99), lastStop: THREE_PM + min(99) }),
         undefined,
         THREE_PM - min(30),
-      ).map((t) => t.actual)
+      ).map((t) => t.expected)
       const base = arm(null)
       expect(arm('1')).toEqual(base)
       expect(arm('2')).toEqual(base)
@@ -563,15 +591,15 @@ describe('createTimestamps', () => {
       expect(ts[0].planned.start).toBe(THREE_PM)
     })
 
-    // Reverse-derived planned values feed the actual chain like any other
+    // Reverse-derived planned values feed the expected chain like any other
     // planned values: FUTURE timers with no kickoff mirror them, drift = 0.
-    it('reverse-derived planned values flow into actual chain', () => {
+    it('reverse-derived planned values flow into expected chain', () => {
       timeset.timerId = null
       timers[2].startTime = new Date(THREE_PM + min(20))
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
       expect(ts[0].state).toBe('FUTURE')
-      expect(ts[0].actual.start).toBe(THREE_PM)
-      expect(ts[0].actual.finish).toBe(THREE_PM + min(10))
+      expect(ts[0].expected.start).toBe(THREE_PM)
+      expect(ts[0].expected.finish).toBe(THREE_PM + min(10))
       expect(ts[0].startDrift).toBe(0)
       expect(ts[0].finishDrift).toBe(0)
     })
@@ -644,7 +672,7 @@ describe('createTimestamps', () => {
       expect(ts[0].startDrift).toBe(min(5))
       // Projection lands the show 5min past the target.
       expect(ts[2].planned.finish).toBe(targetEnd)
-      expect(ts[2].actual.finish).toBe(targetEnd + min(5))
+      expect(ts[2].expected.finish).toBe(targetEnd + min(5))
       expect(ts[2].finishDrift).toBe(min(5))
     })
 
@@ -678,14 +706,14 @@ describe('createTimestamps', () => {
       expect(ts[2].planned.finish).toBe(white)
     })
 
-    it('reverse-derived back times flow into actual chain pre-kickoff (drift 0)', () => {
+    it('reverse-derived back times flow into expected chain pre-kickoff (drift 0)', () => {
       timeset.timerId = null
       const targetEnd = THREE_PM + min(30)
       const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, { frozen: targetEnd })
       for (const t of ts) {
         expect(t.state).toBe('FUTURE')
-        expect(t.actual.start).toBe(t.planned.start)
-        expect(t.actual.finish).toBe(t.planned.finish)
+        expect(t.expected.start).toBe(t.planned.start)
+        expect(t.expected.finish).toBe(t.planned.finish)
         expect(t.startDrift).toBe(0)
         expect(t.finishDrift).toBe(0)
       }
@@ -750,7 +778,7 @@ describe('createTimestamps', () => {
       }
     })
 
-    it('identity: last cue\'s actual.start − backTime = show over/under against the target', () => {
+    it('identity: last cue\'s expected.start − backTime = show over/under against the target', () => {
       // Plan: t1 15:00–15:10, t2/t3 chained to 15:30; target 15:40 (10min headroom).
       // Show kicks off 15min late → projected 5min over the target.
       timers[0].startTime = new Date(THREE_PM)
@@ -761,8 +789,8 @@ describe('createTimestamps', () => {
       const now = THREE_PM + min(16)
       const ts = createTimestamps(timers, timeset, undefined, now, null, {}, { frozen: targetEnd })
       const last = ts[2]
-      expect(last.actual.finish! - targetEnd).toBe(min(5))
-      expect(last.actual.start! - last.backTime!).toBe(min(5))
+      expect(last.expected.finish! - targetEnd).toBe(min(5))
+      expect(last.expected.start! - last.backTime!).toBe(min(5))
       // …and it differs from finishDrift (vs the plan end) by exactly the headroom.
       expect(last.finishDrift).toBe(min(15))
     })
@@ -902,14 +930,14 @@ describe('createTimestamps', () => {
         expect(t).toHaveProperty('planned.start')
         expect(t).toHaveProperty('planned.finish')
         expect(t).toHaveProperty('planned.duration')
-        expect(t).toHaveProperty('actual.start')
-        expect(t).toHaveProperty('actual.finish')
-        expect(t).toHaveProperty('actual.duration')
+        expect(t).toHaveProperty('expected.start')
+        expect(t).toHaveProperty('expected.finish')
+        expect(t).toHaveProperty('expected.duration')
         expect(t).toHaveProperty('startDrift')
         expect(t).toHaveProperty('finishDrift')
         expect(t).toHaveProperty('gap')
         expect(t).toHaveProperty('backTime')
-        expect(t).toHaveProperty('hasMemory')
+        expect(t).toHaveProperty('memory')
         expect(t).toHaveProperty('explicitStart')
         expect(t).toHaveProperty('explicitFinish')
         expect(typeof t.planned.start).toBe('number')
