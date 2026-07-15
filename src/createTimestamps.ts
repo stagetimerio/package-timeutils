@@ -35,21 +35,18 @@ const TIMESTAMP_STATE = {
  * (`timeset`), the room's date, the timezone, and any memory of past runs.
  * It returns one row per timer with two parallel timelines plus the facts:
  *
- *   - **planned** — when the rundown *says* this timer should start, finish,
- *     and how long it should last. Pure schedule.
- *   - **expected** — the reality-anchored chain: recorded history (PAST), live
- *     kickoff + clock (ACTIVE), projection from the prior row (FUTURE). Reality
- *     where known, projection where not.
- *   - **memory** — the raw recorded facts for this timer, or `null`. Never a
- *     guess.
+ *   - **planned** — pure schedule. What the rundown says.
+ *   - **expected** — reality where known, projection where not: history (PAST),
+ *     live kickoff + clock (ACTIVE), the prior row (FUTURE).
+ *   - **memory** — the raw facts of the row's last run, or `null`.
  *
- * Plus a few derived fields per row: `startDrift` / `finishDrift` (expected −
- * planned at each endpoint), `gap` (the planned pause before this row), and
- * flags for how the row should render (`explicitStart`, `explicitFinish`).
+ * Plus derived fields per row: `startDrift` / `finishDrift` (expected − planned
+ * at each endpoint), `gap` (the planned pause before this row), and render
+ * flags (`explicitStart`, `explicitFinish`).
  *
- * Consumers should **read memory-first** — `memory.start ?? expected.start`,
- * same for finish — so facts win wherever they exist and `expected` is only
- * consulted where it genuinely is a forecast. See `Timestamp` in `./types`.
+ * Read `expected` for the timeline and `memory` for facts — but `memory` is
+ * stale on jumped-back rows (`state === 'FUTURE'`). See `Timestamp` in
+ * `./types`.
  *
  * ## Rules
  *
@@ -96,6 +93,14 @@ const TIMESTAMP_STATE = {
  *   would jump around as the pointer moves. Once the show has started,
  *   PAST rows without memory really do mean "skipped" and collapse as
  *   documented. `state` itself is not affected — only the expected chain.
+ * - **No active cue → the projection is the plan.** `timeset.timerId` can be
+ *   null or dangle at a deleted timer. With no position to be relative to,
+ *   every row is `FUTURE` and the chain re-projects from the plan, ignoring
+ *   memory — the pre-show reading. Deliberate: losing the cue blanks the
+ *   output, so the timestamps agree. The one case where the chain walks past
+ *   real facts: drift reads `0` while `memory` keeps the truth. Consumers
+ *   gating on "has the show started" must check the pointer *resolves* —
+ *   memory alone reads a plan-only projection as a live judgment.
  * - **Drift / gap inherit nulls.** `startDrift` / `finishDrift` / `gap` are
  *   `null` when either endpoint of the subtraction is null. `gap` is `0` for
  *   the first row by convention.

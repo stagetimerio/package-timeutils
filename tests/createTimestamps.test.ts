@@ -387,6 +387,13 @@ describe('createTimestamps', () => {
       expect(ts[2].memory?.finish).toBe(THREE_PM + min(30))
       expect(ts[2].expected.start).toBe(THREE_PM + min(50))
       expect(ts[2].expected.finish).toBe(THREE_PM + min(60))
+
+      // The trap: `memory.start ?? expected.start` looks like a safe
+      // "prefer the fact" read, and is wrong here — it returns last pass's
+      // 3:10 for a cue that runs at 3:40. `memory` is stale exactly when
+      // state is FUTURE; read `expected` for the timeline.
+      expect(ts[1].memory?.start ?? ts[1].expected.start).toBe(THREE_PM + min(10)) // stale!
+      expect(ts[1].expected.start).toBe(THREE_PM + min(40)) // correct
     })
 
     it('paused PAST timer: expected.duration is wall-clock (finish - start), not elapsed', () => {
@@ -412,12 +419,42 @@ describe('createTimestamps', () => {
       expect(ts[0].finishDrift).toBe(min(10)) // planned was 10min, slot took 20min
     })
 
+    it('no active cue (deleted or null): every row FUTURE, chain re-projects from the plan', () => {
+      // Deleting the active cue leaves `timerId` dangling at a timer that is
+      // no longer in the list (the delete path stops the timer but never
+      // clears the pointer). With nothing to be positional about, the chain
+      // reads exactly as it would pre-show — the plan — even though cue 1
+      // really ran 5min late. Deliberate: the state is destructive and blanks
+      // the output, so the timestamps agree rather than half-projecting off
+      // history. The facts survive on `memory` for consumers that read it.
+      timers[0].startTime = new Date(THREE_PM)
+      const memory: MemoryInput = {
+        timers: {
+          '1': { start: THREE_PM + min(5), finish: THREE_PM + min(15), elapsed: min(10) },
+        },
+      }
+      const now = THREE_PM + min(16)
+
+      for (const timerId of ['99', null]) { // '99' = dangling, null = none
+        const ts = createTimestamps(
+          timers,
+          { ...timeset, timerId, running: false, kickoff: THREE_PM + min(5), lastStop: now },
+          undefined, now, null, memory,
+        )
+        expect(ts.every(t => t.state === 'FUTURE')).toBe(true)
+        // Chain forgets the 5min: projects the plan.
+        expect(ts[0].expected.start).toBe(THREE_PM)
+        expect(ts[0].startDrift).toBe(0)
+        // ...but the fact is still right there.
+        expect(ts[0].memory?.start).toBe(THREE_PM + min(5))
+      }
+    })
+
     it('ACTIVE cue: memory carries the fact start, expected carries the projected finish', () => {
-      // The hybrid row. Memory-first per field is the whole point: a consumer
-      // reads `memory.start` (a fact — it really started at 3:02) and falls
-      // through to `expected.finish` (a projection — it hasn't stopped yet),
-      // with no `state` check. A row-level "is this settled" flag can't express
-      // this, which is why the old `hasMemory` boolean is gone.
+      // The hybrid row, and the reason facts are tracked per field: `start` is
+      // a fact (it really started at 3:02) while `finish` is still a projection
+      // (it hasn't stopped). The old `hasMemory` boolean keyed on `finish`, so
+      // it read false here — indistinguishable from a cue that never ran.
       timers[0].startTime = new Date(THREE_PM)
       timeset.timerId = '1'
       timeset.running = true

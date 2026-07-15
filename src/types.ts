@@ -63,10 +63,15 @@ export type TimerTrigger = 'MANUAL' | 'LINKED' | 'SCHEDULED'
  *   - `FUTURE` — index is after the active timer, or the active cue while
  *                merely armed (reset/parked at the start — not started yet)
  *
- * With no active timer, every row is `FUTURE`. Memory never sets state, so a
- * PAST timer without memory (skipped) and a FUTURE timer with memory (jumped
- * back from) are both valid and meaningful. Memory is carried separately by
- * `memory`.
+ * Memory never sets state, so a PAST timer without memory (skipped) and a
+ * FUTURE timer with memory (jumped back from) are both valid and meaningful.
+ * Memory is carried separately by `memory`.
+ *
+ * With no active timer — `timeset.timerId` null, or dangling at a deleted
+ * timer — there is no position to be relative to, so every row is `FUTURE`
+ * and the chain projects from the plan no matter how much has already run
+ * (see "No active cue" in `createTimestamps`). Don't read "everything is
+ * FUTURE" as "nothing has run": check `memory` for that.
  */
 export type TimestampState = 'PAST' | 'ACTIVE' | 'FUTURE'
 
@@ -156,25 +161,20 @@ export interface TargetInput {
  * ## Three channels: `planned`, `expected`, `memory`
  *
  * - **`planned`** — pure schedule. What the rundown says.
- * - **`expected`** — the reality-anchored chain: reality where known,
- *   projection where not. Passes *through* facts, so for a settled row it
- *   equals `memory` by construction.
- * - **`memory`** — raw recorded facts, or `null`. Never a guess.
+ * - **`expected`** — the timeline: reality where known, projection where not.
+ *   Read this for "when does this row run".
+ * - **`memory`** — raw facts of the row's LAST run, or `null`. Never a guess.
  *
- * **Read memory-first.** Take `memory.start` / `memory.finish` when non-null
- * and fall back to the `expected.*` counterpart. Then the name is true at the
- * point of use: you only touch `expected.*` when no fact exists for that
- * field, which is exactly when it *is* a forecast. This resolves the hybrid
- * per field with no `state` check — an ACTIVE row yields a fact start
- * (`memory.start`) and a projected finish (`expected.finish`), which is the
- * honest reading. Display rule falls out of it: facts render solid, forecasts
- * italic, and a guess can never masquerade as a fact.
+ * **`memory` is stale when `state === 'FUTURE'`** — jump back over a cue and
+ * it still holds the previous pass while `expected` projects the next run, so
+ * `memory.start ?? expected.start` is NOT a safe read: it returns last pass's
+ * start for a cue that hasn't run yet.
  *
- * Don't infer settledness from `memory !== null`: it means "this ran before,
- * at least partly", not "this is finished". A resumed cue has
- * `memory.finish` from its *last* stop while its live finish is still a
- * projection. Per-field memory-first handles this; a row-level "is it a fact"
- * flag cannot.
+ * A value is a fact iff `state !== 'FUTURE' && memory?.<field> != null` — per
+ * field, which is the point. An ACTIVE row has a fact start and a projected
+ * finish (`memory.finish === null`); the old `hasMemory` boolean keyed on
+ * `finish`, so it couldn't tell a live cue from one that never ran. Facts
+ * render solid, everything else italic.
  *
  * `startDrift` and `finishDrift` are the schedule delta measured at the two
  * endpoints of the same timer — drift entering and drift exiting. Both
@@ -215,9 +215,9 @@ export interface Timestamp {
    * when nothing better is known — so `expected` inherits `null` when planned
    * is null.
    *
-   * Passes through facts rather than excluding them, so a settled row's
-   * `expected` equals its `memory`. Read memory-first (see above) and this is
-   * only ever consulted where it genuinely is a forecast.
+   * Passes through facts rather than excluding them, so a row that has run
+   * this pass has `expected` equal to its `memory`. This is the timeline —
+   * read it for "when does this row run", whatever the state.
    */
   expected: { start: number | null, finish: number | null, duration: number }
 
@@ -226,8 +226,10 @@ export interface Timestamp {
    * has never run. Fields are independently nullable: `start` without `finish`
    * is a cue that started and hasn't stopped.
    *
-   * This is the fact channel. Facts render from here; forecasts render from
-   * `expected`. Consumers never need to cross-read a memory store.
+   * The fact channel, but it describes the row's *last* run — stale when
+   * `state === 'FUTURE'` (jumped back). Fact iff
+   * `state !== 'FUTURE' && memory?.<field> != null`. Consumers never need to
+   * cross-read a memory store.
    */
   memory: MemoryTimerEntry | null
 
