@@ -137,7 +137,6 @@ export interface MemoryTimerEntry {
 }
 
 export interface MemoryInput {
-  driftResetAt?: number | null
   timers?: Record<string, MemoryTimerEntry>
 }
 
