@@ -99,6 +99,89 @@ describe('createTimestamps', () => {
     })
   })
 
+  describe('liveGap', () => {
+    it('is 0 for the first row and equals gap pre-show', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      timers[1].startTime = new Date(THREE_PM + min(15)) // 5min scheduled gap
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      expect(ts[0].liveGap).toBe(0)
+      expect(ts[1].liveGap).toBe(min(5))
+      expect(ts[2].liveGap).toBe(0) // chained
+    })
+
+    it('is null when the planned gap is unresolvable pre-show', () => {
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      expect(ts[1].gap).toBe(null)
+      expect(ts[1].liveGap).toBe(null)
+    })
+
+    it('an armed pointer pre-show does not flip liveGap to live values', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      timers[1].startTime = new Date(THREE_PM + min(15))
+      timeset.timerId = '2'
+      timeset.running = false
+      timeset.kickoff = THREE_PM
+      timeset.lastStop = THREE_PM // armed: parked at the start, not started
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      expect(ts[1].liveGap).toBe(ts[1].gap)
+    })
+
+    it('drift eats the buffer: hard-start FUTURE row measures against its anchor', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      timers[1].startTime = new Date(THREE_PM + min(15)) // 5min planned buffer
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(2) // 2min late
+      const now = THREE_PM + min(5)
+      const ts = createTimestamps(timers, timeset, undefined, now)
+      // t1 expected finish = 12; anchor at 15 → 3min left of the 5min buffer
+      expect(ts[1].gap).toBe(min(5))
+      expect(ts[1].liveGap).toBe(min(3))
+    })
+
+    it('goes negative on a live overlap where expected.start clamps', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      timers[1].startTime = new Date(THREE_PM + min(15)) // 5min planned buffer
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(8) // 8min late
+      const now = THREE_PM + min(10)
+      const ts = createTimestamps(timers, timeset, undefined, now)
+      // t1 expected finish = 18, anchor at 15 → 3min live overlap; the clamped
+      // expected.start (18) could never show it
+      expect(ts[1].expected.start).toBe(THREE_PM + min(18))
+      expect(ts[1].liveGap).toBe(-min(3))
+    })
+
+    it('soft FUTURE rows chain to 0 once the show has started', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(5)
+      const now = THREE_PM + min(6)
+      const ts = createTimestamps(timers, timeset, undefined, now)
+      expect(ts[1].liveGap).toBe(0)
+      expect(ts[2].liveGap).toBe(0)
+    })
+
+    it('a row already run reads the pause actually taken', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '2'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(12)
+      const now = THREE_PM + min(13)
+      const memory: MemoryInput = {
+        timers: {
+          '1': { start: THREE_PM, finish: THREE_PM + min(10), elapsed: min(10) },
+          '2': { start: THREE_PM + min(12), finish: null, elapsed: min(1) },
+        },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, now, null, memory)
+      // t2 started at 12, t1 finished at 10 → a 2min pause was actually taken
+      expect(ts[1].liveGap).toBe(min(2))
+    })
+  })
+
   describe('FINISH_TIME planned', () => {
     it('computes planned.duration from finishTime - plannedStart', () => {
       timers[0].startTime = new Date(THREE_PM)

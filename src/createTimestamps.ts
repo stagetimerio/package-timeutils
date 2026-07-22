@@ -41,7 +41,8 @@ const TIMESTAMP_STATE = {
  *   - **memory** — the raw facts of the row's last run, or `null`.
  *
  * Plus derived fields per row: `startDrift` / `finishDrift` (expected − planned
- * at each endpoint), `gap` (the planned pause before this row), and render
+ * at each endpoint), `gap` (the planned pause before this row), `liveGap` (the
+ * pause actually there now — see the field doc in `./types`), and render
  * flags (`explicitStart`, `explicitFinish`).
  *
  * Read `expected` for the timeline and `memory` for facts — but `memory` is
@@ -205,6 +206,7 @@ export function createTimestamps (
       startDrift: null,
       finishDrift: null,
       gap: null,
+      liveGap: null,
       backTime: null,
       explicitStart: !!timer.startTime,
       explicitFinish: timer.type === TIMER_TYPES.FINISH_TIME,
@@ -336,6 +338,19 @@ export function createTimestamps (
     row.gap = plannedStart && prev?.planned.finish
       ? plannedStart - prev.planned.finish
       : i === 0 ? 0 : null
+
+    // Live gap — see the field doc in ./types. A still-future hard start
+    // measures against its fixed anchor (`planned.start`), not the clamped
+    // `expected.start`, so a live overlap can read negative.
+    if (i === 0) row.liveGap = 0
+    else if (!showStarted) row.liveGap = row.gap
+    else if (prev?.expected.finish == null) row.liveGap = null
+    else if (row.state === TIMESTAMP_STATE.FUTURE && timer.startTime && plannedStart != null) {
+      row.liveGap = plannedStart - prev.expected.finish
+    } else {
+      row.liveGap = expectedStart != null ? expectedStart - prev.expected.finish : null
+    }
+
     row.backTime = headroom != null && plannedStart != null ? plannedStart + headroom : null
   }
 

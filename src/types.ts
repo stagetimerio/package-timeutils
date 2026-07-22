@@ -242,6 +242,23 @@ export interface Timestamp {
   gap: number | null
 
   /**
+   * The signed live boundary before this timer — time actually available
+   * there *now*, negative when the chain above runs past this point. Drift
+   * eats it as the show runs; `gap` is what the plan set aside, this is what
+   * is left.
+   *
+   * Pre-show it equals `gap`: nothing live to read, the plan stands as
+   * written. Once the show has started it reads
+   * `expected.start - prev.expected.finish` — except for a still-future hard
+   * start, which measures against its fixed anchor (`planned.start`) instead:
+   * the forward chain clamps `expected.start` to `max(anchor, prevFinish)`,
+   * which can never go negative and would hide a live overlap. Chained soft
+   * rows read ~0 by construction; rows already run read the pause actually
+   * taken. `null` when an endpoint is unresolvable; `0` for the first row.
+   */
+  liveGap: number | null
+
+  /**
    * Latest start that still lands the show on the target end — the plan timed
    * backward from `targetEnd` through the same durations + gaps, which reduces
    * to `planned.start` shifted by the plan-to-target headroom

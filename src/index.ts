@@ -7,6 +7,7 @@
 export * from './abbreviations'
 export * from './applyDate'
 export * from './createTimestamps'
+export * from './deriveDatePlus'
 export * from './dhmsToDigits'
 export * from './dhmsToMilliseconds'
 export * from './fastDeepEqual'
