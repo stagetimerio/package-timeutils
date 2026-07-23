@@ -1040,6 +1040,182 @@ describe('createTimestamps', () => {
     })
   })
 
+  // The front wall (R38): once the run has memory, the first row in list
+  // order with a recorded start pins its planned start to that fact — but
+  // only when no planning anchor reaches the row. Fact fills holes, never
+  // overrides planning. The pin forward-fills downstream, so edits propagate
+  // downstream only; the reverse walk only fills the segment above the wall.
+  describe('front wall: planned chain clamped on the recorded show start', () => {
+    it('anchor-less show: wall pins planned.start to the recorded start, chain forward-fills', () => {
+      timeset.timerId = '1'
+      timeset.running = true
+      const memory: MemoryInput = {
+        timers: { '1': { start: THREE_PM, finish: null, elapsed: 0 } },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(2), null, memory)
+      expect(ts[0].pinnedStart).toBe(true)
+      expect(ts[0].planned.start).toBe(THREE_PM)
+      expect(ts[0].planned.finish).toBe(THREE_PM + min(10))
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      expect(ts[2].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[1].pinnedStart).toBe(false)
+      expect(ts[2].pinnedStart).toBe(false)
+      // Anchor-row drift is 0 by construction — the accepted, minimal tautology.
+      expect(ts[0].startDrift).toBe(0)
+    })
+
+    it('regression: editing a future cue cannot move planned starts at or above the edit', () => {
+      // The original bug: with no hard anchor, the whole planned chain was
+      // reverse-filled from the (kickoff-frozen) target end, so extending a
+      // future cue telescoped every planned start upward through past rows.
+      timeset.timerId = '1'
+      timeset.running = true
+      const memory: MemoryInput = {
+        timers: { '1': { start: THREE_PM, finish: null, elapsed: 0 } },
+      }
+      const target = { frozen: THREE_PM + min(30) }
+      const before = createTimestamps(timers, timeset, undefined, THREE_PM + min(2), null, memory, target)
+
+      timers[2].minutes = 20 // extend the last cue by 10min
+      const after = createTimestamps(timers, timeset, undefined, THREE_PM + min(2), null, memory, target)
+
+      expect(after[0].planned.start).toBe(before[0].planned.start)
+      expect(after[1].planned.start).toBe(before[1].planned.start)
+      expect(after[2].planned.start).toBe(before[2].planned.start)
+      // The excess lands downstream: the plan end overshoots the frozen target.
+      expect(after[2].planned.finish).toBe(before[2].planned.finish + min(10))
+      expect(after[2].planned.finish).toBe(target.frozen + min(10))
+    })
+
+    it('show started mid-list: rows above the wall get back-timed advisory starts, no pin', () => {
+      timeset.timerId = '2'
+      timeset.running = true
+      const memory: MemoryInput = {
+        timers: { '2': { start: THREE_PM, finish: null, elapsed: 0 } },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(1), null, memory)
+      // Wall is row 1; row 0 back-times off the pin ("you'd have needed to start here").
+      expect(ts[1].pinnedStart).toBe(true)
+      expect(ts[1].planned.start).toBe(THREE_PM)
+      expect(ts[0].pinnedStart).toBe(false)
+      expect(ts[0].planned.start).toBe(THREE_PM - min(10))
+      expect(ts[0].planned.finish).toBe(THREE_PM)
+      // The plan keeps its duration; only `expected` collapses the skipped row.
+      expect(ts[0].planned.duration).toBe(min(10))
+      expect(ts[0].expected.finish).toBe(ts[0].expected.start)
+      expect(ts[0].memory).toBe(null)
+    })
+
+    it('soft-first/hard-second: pre-show back-times off the anchor, mid-show the wall pins', () => {
+      timers[1].startTime = new Date(THREE_PM + min(15))
+
+      // Pre-show: cue 1 back-times off cue 2's hard start.
+      const pre = createTimestamps(timers, timeset, undefined, THREE_PM - min(30))
+      expect(pre[0].planned.start).toBe(THREE_PM + min(5))
+      expect(pre[0].pinnedStart).toBe(false)
+
+      // Mid-show: the wall pins cue 1 at its recorded start — its planned
+      // start no longer slides under its own duration edits.
+      timeset.timerId = '1'
+      timeset.running = true
+      const memory: MemoryInput = {
+        timers: { '1': { start: THREE_PM, finish: null, elapsed: 0 } },
+      }
+      const mid = createTimestamps(timers, timeset, undefined, THREE_PM + min(1), null, memory)
+      expect(mid[0].pinnedStart).toBe(true)
+      expect(mid[0].planned.start).toBe(THREE_PM)
+      expect(mid[1].planned.start).toBe(THREE_PM + min(15)) // hard anchor untouched
+
+      timers[0].minutes = 20 // pre-fix this back-timed the start 10min earlier
+      const edited = createTimestamps(timers, timeset, undefined, THREE_PM + min(1), null, memory)
+      expect(edited[0].planned.start).toBe(THREE_PM)
+    })
+
+    it('planning wins: a wall row with its own startTime is never pinned — drift is measured', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '1'
+      timeset.running = true
+      const memory: MemoryInput = {
+        timers: { '1': { start: THREE_PM + min(2), finish: null, elapsed: 0 } },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(3), null, memory)
+      expect(ts[0].pinnedStart).toBe(false)
+      expect(ts[0].planned.start).toBe(THREE_PM)
+      expect(ts[0].startDrift).toBe(min(2)) // real measurement, not 0-by-construction
+    })
+
+    it('planning wins: an upstream anchor chain reaching the wall row is never overridden', () => {
+      // Cue 1 has a hard start but never ran; the show began at cue 2. The
+      // chain from cue 1's anchor IS the plan — measure against it.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '2'
+      timeset.running = true
+      const memory: MemoryInput = {
+        timers: { '2': { start: THREE_PM + min(15), finish: null, elapsed: 0 } },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(16), null, memory)
+      expect(ts[1].pinnedStart).toBe(false)
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+      expect(ts[1].startDrift).toBe(min(5))
+    })
+
+    it('planning wins: a FINISH_TIME wall row derives its start from finishTime, no pin', () => {
+      timers[0].type = 'FINISH_TIME'
+      timers[0].finishTime = new Date(THREE_PM + min(10))
+      timeset.timerId = '1'
+      timeset.running = true
+      const memory: MemoryInput = {
+        timers: { '1': { start: THREE_PM + min(1), finish: null, elapsed: 0 } },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(2), null, memory)
+      expect(ts[0].pinnedStart).toBe(false)
+      expect(ts[0].planned.start).toBe(THREE_PM) // finishTime − duration
+    })
+
+    it('no memory → no wall: reset restores pure planning (honest nulls)', () => {
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM)
+      for (const t of ts) {
+        expect(t.pinnedStart).toBe(false)
+        expect(t.planned.start).toBe(null)
+      }
+    })
+
+    it('wall relocation (accepted wart): running an earlier cue moves the wall up in list order', () => {
+      // Show began at cue 3; the wall sits there.
+      timeset.timerId = '3'
+      timeset.running = true
+      const memory: MemoryInput = {
+        timers: { '3': { start: THREE_PM, finish: null, elapsed: 0 } },
+      }
+      const ts1 = createTimestamps(timers, timeset, undefined, THREE_PM + min(1), null, memory)
+      expect(ts1[2].pinnedStart).toBe(true)
+      expect(ts1[2].planned.start).toBe(THREE_PM)
+
+      // Operator jumps back and runs cue 1 (later in wall-clock): the wall
+      // relocates to cue 1 and the whole plan re-derives from that later time.
+      timeset.timerId = '1'
+      memory.timers!['1'] = { start: THREE_PM + min(50), finish: null, elapsed: 0 }
+      const ts2 = createTimestamps(timers, timeset, undefined, THREE_PM + min(51), null, memory)
+      expect(ts2[0].pinnedStart).toBe(true)
+      expect(ts2[0].planned.start).toBe(THREE_PM + min(50))
+      expect(ts2[2].pinnedStart).toBe(false)
+      expect(ts2[2].planned.start).toBe(THREE_PM + min(70)) // forward-filled from the new wall
+    })
+
+    it('dangling/null pointer with memory: the wall still pins the planned chain', () => {
+      // Losing the cue blanks the projection (every row FUTURE, re-projects
+      // from the plan) — but the plan itself stays clamped on the run's start.
+      const memory: MemoryInput = {
+        timers: { '1': { start: THREE_PM, finish: THREE_PM + min(10), elapsed: min(10) } },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(11), null, memory)
+      expect(ts[0].state).toBe('FUTURE')
+      expect(ts[0].pinnedStart).toBe(true)
+      expect(ts[0].planned.start).toBe(THREE_PM)
+      expect(ts[1].planned.start).toBe(THREE_PM + min(10))
+    })
+  })
+
   describe('output shape', () => {
     it('every timestamp has the documented keys', () => {
       timers[0].startTime = new Date(THREE_PM)
@@ -1058,6 +1234,7 @@ describe('createTimestamps', () => {
         expect(t).toHaveProperty('gap')
         expect(t).toHaveProperty('backTime')
         expect(t).toHaveProperty('memory')
+        expect(t).toHaveProperty('pinnedStart')
         expect(t).toHaveProperty('explicitStart')
         expect(t).toHaveProperty('explicitFinish')
         expect(typeof t.planned.start).toBe('number')

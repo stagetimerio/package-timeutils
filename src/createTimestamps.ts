@@ -54,13 +54,28 @@ const TIMESTAMP_STATE = {
  * - **Honest nulls.** `planned.start` / `planned.finish` are `null` when the
  *   chain has no anchor (no `startTime` / `finishTime`) reachable upstream
  *   *or* downstream. We don't fabricate a fallback like `kickoff || now` —
- *   null is the truth. No anchors anywhere → all planned values null.
+ *   null is the truth. No anchors anywhere → all planned values null. Once
+ *   the run has memory, the front wall (below) is an anchor.
  * - **Anchors radiate both ways.** A single hard anchor (`startTime`, or
  *   FINISH_TIME with `finishTime`) seeds the chain forward (`next.start =
  *   prev.finish`) AND backward (`prev.finish = next.start`, `prev.start =
  *   prev.finish - duration`). Forward wins on collisions. The backward walk
  *   halts at any upstream hard `startTime` (which becomes its own backward
  *   anchor).
+ * - **The front wall: fact fills holes, never overrides planning.** Once the
+ *   run has memory, the first timer in list order with a recorded start pins
+ *   its planned start to that fact (`pinnedStart: true`) — but only when no
+ *   planning anchor reaches the row (no own `startTime`/`finishTime`, no
+ *   chain from an upstream anchor). The pin forward-fills downstream like a
+ *   hard start, so the reverse walk only fills the segment *above* the wall
+ *   (advisory back-timed starts). Edits therefore propagate downstream only:
+ *   a future-cue edit can't telescope planned starts upward through past
+ *   rows. Derived every pass, never stored — the wall evaporates with the
+ *   memory doc on reset, and editing the wall row's start promotes it to a
+ *   real planned anchor. The memory read here is deliberately state-blind
+ *   (unlike the per-row fact rule): the wall is a show-level anchor — "where
+ *   did this run begin" — not a row-level display fact, so a jumped-back
+ *   wall row still holds it.
  * - **Duration defaults to 0.** Durations can never be negative, so `0` is the
  *   honest "don't know" value. Saves null checks at the boundary.
  * - **Expected mirrors planned by default.** When we don't know any better
@@ -161,6 +176,12 @@ export function createTimestamps (
   const showStarted: boolean = (activeIdx >= 0 && !activeIsArmed)
     || Object.keys(memory.timers ?? {}).length > 0
 
+  // Front wall (see the rule above): the first timer in list order with a
+  // recorded start. -1 pre-show or once the memory doc is gone — reset
+  // restores pure planning by construction. Deleted timers aren't in the
+  // list, so ghosts never hold the wall.
+  const wallIdx: number = timers.findIndex(t => memory.timers?.[String(t._id)]?.start != null)
+
   const out: Timestamp[] = []
 
   // --- Pass 1: forward planned + static fields ---------------------------
@@ -197,6 +218,16 @@ export function createTimestamps (
       if (plannedStart) plannedFinish = plannedStart + plannedDuration
     }
 
+    // Front wall pin — after the type blocks so every planning source (own
+    // startTime, upstream chain, finishTime − duration) has had its say.
+    // Fact fills the hole; it never overrides planning.
+    let pinnedStart = false
+    if (plannedStart == null && i === wallIdx && mem?.start != null) {
+      plannedStart = mem.start
+      plannedFinish = plannedStart + plannedDuration
+      pinnedStart = true
+    }
+
     out.push({
       timerId: timer._id,
       state,
@@ -208,6 +239,7 @@ export function createTimestamps (
       gap: null,
       liveGap: null,
       backTime: null,
+      pinnedStart,
       explicitStart: !!timer.startTime,
       explicitFinish: timer.type === TIMER_TYPES.FINISH_TIME,
     })

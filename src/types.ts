@@ -269,6 +269,15 @@ export interface Timestamp {
    */
   backTime: number | null
 
+  /**
+   * This row is the front wall: its `planned.start` is pinned to the run's
+   * recorded start because no planning anchor reached the row. Fact-frozen —
+   * render white like a hard start, dies with the memory doc on reset.
+   * Derived every pass, never stored. `false` whenever planning resolved the
+   * start, even on the wall row itself.
+   */
+  pinnedStart: boolean
+
   /** Timer has a `startTime` anchor — render separately, and a preceding `gap` is a scheduled pause. */
   explicitStart: boolean
 
