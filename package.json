@@ -30,7 +30,7 @@
     "test:LA": "TZ='America/Los_Angeles' vitest run",
     "test:BER": "TZ='Europe/Berlin' vitest run",
     "test:SYD": "TZ='Australia/Sydney' vitest run",
-    "test:ci": "vitest run",
+    "test:ci": "vitest run --no-color",
     "prepublishOnly": "npm run typecheck && npm run build"
   },
   "author": "Lukas Hermann <hey@lukashermann.dev>",
