@@ -212,6 +212,27 @@ describe('dhmsToDigits', () => {
       expect(join(makeDhms({ hours: 1, seconds: 45 }), { format: 'SSS' })).to.equal('3645')
     })
 
+    test('exactly 10 days keeps the tens digit', () => {
+      expect(join(makeDhms({ days: 10, hours: 4, minutes: 23, seconds: 56 }), { format: 'L_DHMS' })).to.equal('10d 4h 23m 56s')
+      expect(join(makeDhms({ days: 10, hours: 4, minutes: 23, seconds: 56 }), { format: 'DHHMMSS' })).to.equal('10:04:23:56')
+    })
+
+    test('exactly 100 days keeps the hundreds digit', () => {
+      expect(join(makeDhms({ days: 100, hours: 4, minutes: 23, seconds: 56 }), { format: 'DHHMMSS' })).to.equal('100:04:23:56')
+    })
+
+    test('exactly 1000 hours keeps the thousands digit', () => {
+      expect(join(makeDhms({ days: 41, hours: 16, minutes: 30, seconds: 45 }))).to.equal('1000:30:45')
+    })
+
+    test('exactly 1000 minutes keeps the thousands digit', () => {
+      expect(join(makeDhms({ hours: 16, minutes: 40, seconds: 45 }), { format: 'MMMSS' })).to.equal('1000:45')
+    })
+
+    test('exactly 1000 seconds keeps the thousands digit', () => {
+      expect(join(makeDhms({ minutes: 16, seconds: 40 }), { format: 'SSS' })).to.equal('1000')
+    })
+
     test('round up days when hiding smaller units with remainder', () => {
       expect(join(makeDhms({ days: 0, hours: 1, minutes: 30, seconds: 45 }), { format: 'L_D' })).to.equal('1d')
     })

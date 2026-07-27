@@ -147,8 +147,8 @@ export function dhmsToDigits (
 
   // Days
   if (displayDays) {
-    if (days > 100) digits.push(hundreds(days))
-    if (days > 10) digits.push(tens(days))
+    if (days >= 100) digits.push(hundreds(days))
+    if (days >= 10) digits.push(tens(days))
     digits.push(ones(days))
     if (sepLetter) {
       digits.push('d')
@@ -162,7 +162,7 @@ export function dhmsToDigits (
   if (displayHours) {
     // Append thousands and hundreds place of hours if hours are three digits and days are not shown.
     if (hours >= 100 && !displayDays) {
-      if (hours > 1000) digits.push(thousands(hours))
+      if (hours >= 1000) digits.push(thousands(hours))
       digits.push(hundreds(hours))
     }
     // Append tens place of hours if more than 10 hours or if days are shown with colon separator.
@@ -183,7 +183,7 @@ export function dhmsToDigits (
     if (minutes || displayHours || displayDays) {
       // Append thousands and hundreds place of minutes if minutes are three digits and hours are not shown.
       if (minutes >= 100 && !displayHours) {
-        if (minutes > 1000) digits.push(thousands(minutes))
+        if (minutes >= 1000) digits.push(thousands(minutes))
         digits.push(hundreds(minutes))
       }
       // Append tens place of minutes if more than 10 minutes or if there is no letter separator and hours are shown.
@@ -204,7 +204,7 @@ export function dhmsToDigits (
   if (displaySeconds) {
     // Append thousands and hundreds place of seconds if seconds are three digits and minutes are not shown.
     if (seconds >= 100 && !displayMinutes) {
-      if (seconds > 1000) digits.push(thousands(seconds))
+      if (seconds >= 1000) digits.push(thousands(seconds))
       digits.push(hundreds(seconds))
     }
     // Pad seconds to 2 digits when a previous component is displayed with colon separator,
