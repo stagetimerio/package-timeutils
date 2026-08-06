@@ -28,5 +28,6 @@ export * from './moveAfter'
 export * from './parseCalendarDay'
 export * from './parseDate'
 export * from './parseDateAsToday'
+export * from './resolveTimerDatetime'
 
 export * from './types'
