@@ -87,7 +87,67 @@ describe('dhmsToDigits', () => {
     })
   })
 
+  describe('HHH format', () => {
+    test('days overflow into hours, remainder rounds up', () => {
+      expect(join(makeDhms({ days: 1, hours: 17, minutes: 30, seconds: 59 }), { format: 'HHH' })).to.equal('42')
+    })
+
+    test('exact hours do not round up', () => {
+      expect(join(makeDhms({ hours: 2 }), { format: 'HHH' })).to.equal('2')
+    })
+
+    test('sub-hour remainder shows 1', () => {
+      expect(join(makeDhms({ minutes: 30 }), { format: 'HHH' })).to.equal('1')
+    })
+
+    test('zero duration', () => {
+      expect(join(makeDhms(), { format: 'HHH' })).to.equal('0')
+    })
+
+    test('overtime keeps the prefix', () => {
+      expect(join(makeDhms({ negative: 1, minutes: 30 }), { format: 'HHH' })).to.equal('+1')
+    })
+  })
+
+  describe('MMM format', () => {
+    test('hours overflow into minutes, remainder rounds up', () => {
+      expect(join(makeDhms({ hours: 3, minutes: 50, seconds: 59 }), { format: 'MMM' })).to.equal('231')
+    })
+
+    test('exact minutes do not round up', () => {
+      expect(join(makeDhms({ minutes: 5 }), { format: 'MMM' })).to.equal('5')
+    })
+
+    test('last second of a minute still shows that minute', () => {
+      expect(join(makeDhms({ minutes: 4, seconds: 59 }), { format: 'MMM' })).to.equal('5')
+    })
+
+    test('sub-minute remainder shows 1', () => {
+      expect(join(makeDhms({ seconds: 1 }), { format: 'MMM' })).to.equal('1')
+    })
+
+    test('zero duration', () => {
+      expect(join(makeDhms(), { format: 'MMM' })).to.equal('0')
+    })
+
+    test('days overflow into minutes', () => {
+      expect(join(makeDhms({ days: 1, minutes: 30, seconds: 45 }), { format: 'MMM' })).to.equal('1471')
+    })
+  })
+
   describe('letter formats', () => {
+    test('L_H (days overflow into hours, remainder rounds up)', () => {
+      expect(join(makeDhms({ days: 1, hours: 17, minutes: 30, seconds: 59 }), { format: 'L_H' })).to.equal('42h')
+    })
+
+    test('L_M (hours overflow into minutes, remainder rounds up)', () => {
+      expect(join(makeDhms({ hours: 3, minutes: 50, seconds: 59 }), { format: 'L_M' })).to.equal('231m')
+    })
+
+    test('L_M with exact minutes', () => {
+      expect(join(makeDhms({ minutes: 5 }), { format: 'L_M' })).to.equal('5m')
+    })
+
     test('L_DHMS basic', () => {
       expect(join(makeDhms({ days: 1, hours: 17, minutes: 30, seconds: 59 }), { format: 'L_DHMS' })).to.equal('1d 17h 30m 59s')
     })

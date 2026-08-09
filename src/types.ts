@@ -44,6 +44,9 @@ export type TenthsDisplay = 'always'
  *   Append 'F' for decimals:       'L_D', 'L_DH', 'L_DHM' for truncated
  *   'HHHMMSSF' →  41:30:59.5
  *
+ * Single-unit formats round the remainder up, so the displayed number is the
+ * time left *at most*: 'HHH' → 42, 'MMM' → 231, 'L_H' → 42h, 'L_M' → 231m.
+ *
  * Repeated chars are cosmetic — only presence matters.
  * Any string with the right characters works: 'HMS' = 'HHHMMSS' = 'H_M_S'.
  */
