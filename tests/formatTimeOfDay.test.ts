@@ -157,31 +157,29 @@ describe('formatTimeOfDay', () => {
     })
   })
 
-  // ── leadingZero ────────────────────────────────────────────────
+  // ── Leading zero ───────────────────────────────────────────────
 
-  describe('leadingZero', () => {
-    it('should add leading zero to 24h format', () => {
-      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { format: 'H:mm:ss', leadingZero: true })).to.equal('05:10:30')
+  describe('HH:mm:ss / HH:mm (24h with leading zero)', () => {
+    it('should pad single-digit hours', () => {
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { format: 'HH:mm:ss' })).to.equal('05:10:30')
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { format: 'HH:mm' })).to.equal('05:10')
     })
 
-    it('should not add leading zero to 24h format by default', () => {
+    it('should leave double-digit hours untouched', () => {
+      expect(formatTimeOfDay(DATE_WITH_SECONDS, { format: 'HH:mm:ss' })).to.equal('15:10:30')
+    })
+
+    it('should not pad the unpadded variants', () => {
       expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { format: 'H:mm:ss' })).to.equal('5:10:30')
     })
 
-    it('should add leading zero to 12h format', () => {
-      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { format: 'h:mm:ss', leadingZero: true })).to.equal('05:10:30')
+    it('should honor the seconds override', () => {
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { format: 'HH:mm', seconds: 'always' })).to.equal('05:10:30')
+      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { format: 'HH:mm:ss', seconds: 'never' })).to.equal('05:10')
     })
 
-    it('should add leading zero to 12h AM/PM format', () => {
-      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { format: 'h:mm:ss aa', leadingZero: true })).to.equal('05:10:30 AM')
-    })
-
-    it('should add leading zero to H:mm format', () => {
-      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { format: 'H:mm', leadingZero: true })).to.equal('05:10')
-    })
-
-    it('should add leading zero to h:mm aa format', () => {
-      expect(formatTimeOfDay(DATE_SINGLE_DIGIT_HOUR, { format: 'h:mm aa', leadingZero: true })).to.equal('05:10 AM')
+    it('should honor the tenths override', () => {
+      expect(formatTimeOfDay(DATE_WITH_MILLIS, { format: 'HH:mm:ss', tenths: 'always' })).to.equal('15:10:30.7')
     })
   })
 

@@ -28,7 +28,6 @@ function insertBeforeSuffix (fmt: string, fragment: string): string {
  * @param  {string}  [options.format = 'H:mm:ss'] - A date-fns format string (e.g., 'H:mm:ss', 'h:mm aa')
  * @param  {string}  [options.seconds = undefined] - Override: 'always' | 'nonzero' | 'never'. Default: undefined = respect format string as-is.
  * @param  {string}  [options.tenths = undefined] - Override: 'always'. Default: undefined = no tenths shown.
- * @param  {boolean} [options.leadingZero = false] - Whether to display leading zero in hours
  * @return {string} - The formatted time string
  */
 export function formatTimeOfDay (
@@ -38,13 +37,11 @@ export function formatTimeOfDay (
     format = 'H:mm:ss',
     seconds,
     tenths,
-    leadingZero = false,
   }: {
     timezone?: string
     format?: string
     seconds?: SecondsDisplay
     tenths?: TenthsDisplay
-    leadingZero?: boolean
   } = {},
 ): string {
   if (!(date instanceof Date)) return '--:--'
@@ -67,13 +64,6 @@ export function formatTimeOfDay (
   // 2. Apply tenths override (date-fns `S` = fractional second, single digit = tenths)
   if (tenths === 'always') {
     fmt = insertBeforeSuffix(fmt, '.S')
-  }
-
-  // 3. Apply leadingZero
-  if (leadingZero) {
-    // Replace single-char hour tokens with double-char: H → HH, h → hh
-    // Only replace standalone H/h (not already HH/hh)
-    fmt = fmt.replace(/\bH\b/g, 'HH').replace(/\bh\b/g, 'hh')
   }
 
   try {
