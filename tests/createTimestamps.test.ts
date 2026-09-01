@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createTimestamps, resolveTargetEnd } from '../src/createTimestamps'
-import type { TimerInput, TimesetInput, MemoryInput } from '../src/types'
+import { createTimestamps } from '../src/createTimestamps'
+import { resolveTargetEnd } from '../src/timestamp-utils/resolveTargetEnd'
+import type { TimerInput, TimesetInput, MemoryInput, MarkerInput } from '../src/types'
 import { parseDateAsToday } from '../src/parseDateAsToday'
 import timestampsFixture1 from './fixtures/timestamps-1-in.json' with { type: 'json' }
 import timestampsFixture2 from './fixtures/timestamps-2-in.json' with { type: 'json' }
@@ -1241,37 +1242,181 @@ describe('createTimestamps', () => {
       }
     })
   })
+
+  // Markers cut the rundown into segments: each closes the stretch above it
+  // and supplies that stretch's own end, so a multi-day show stops being
+  // measured against the end of the last day.
+  describe('markers: per-segment ends', () => {
+    const marker = (overrides: Partial<MarkerInput> = {}): MarkerInput => ({
+      _id: 'm1',
+      type: 'END_OF_DAY',
+      beforeTimerId: '3',
+      ...overrides,
+    })
+
+    it('no markers: one segment, every row scoped to the show target', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      const targetEnd = THREE_PM + min(40)
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM - min(30), null, {}, { frozen: targetEnd })
+      for (const t of ts) {
+        expect(t.segmentIndex).toBe(0)
+        expect(t.segmentEnd).toBe(targetEnd)
+      }
+    })
+
+    it('splits the rundown at its anchor: rows above and below carry different ends', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      const dayEnd = THREE_PM + min(25)
+      const targetEnd = THREE_PM + min(40)
+      const markers = [marker({ time: new Date(dayEnd) })]
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(30), null, {}, { frozen: targetEnd }, markers)
+      expect(ts.map(t => t.segmentIndex)).toEqual([0, 0, 1])
+      expect(ts[0].segmentEnd).toBe(dayEnd)
+      expect(ts[1].segmentEnd).toBe(dayEnd)
+      expect(ts[2].segmentEnd).toBe(targetEnd)
+    })
+
+    it('reverse walk: soft rows above a marker fill back from it, not from the target', () => {
+      // No hard anchors anywhere. t3 back-fills from the target, t1/t2 from the
+      // marker — without markers all three would chain back off the target.
+      timeset.timerId = null
+      const dayEnd = THREE_PM + min(25)
+      const targetEnd = THREE_PM + min(90)
+      const markers = [marker({ time: new Date(dayEnd) })]
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(60), null, {}, { frozen: targetEnd }, markers)
+      expect(ts[1].planned.finish).toBe(dayEnd)
+      expect(ts[1].planned.start).toBe(dayEnd - min(10))
+      expect(ts[0].planned.finish).toBe(dayEnd - min(10))
+      expect(ts[2].planned.finish).toBe(targetEnd)
+    })
+
+    it('backTime is scoped to the segment: each stretch gets its own headroom', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      // Segment 1 plans 15:00–15:20, ends 15:30 → 10min headroom.
+      // Segment 2 plans 15:20–15:30, ends 15:50 → 20min headroom.
+      const markers = [marker({ time: new Date(THREE_PM + min(30)) })]
+      const targetEnd = THREE_PM + min(50)
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(30), null, {}, { frozen: targetEnd }, markers)
+      expect(ts[0].backTime).toBe(THREE_PM + min(10))
+      expect(ts[1].backTime).toBe(THREE_PM + min(20))
+      expect(ts[2].backTime).toBe(THREE_PM + min(40))
+    })
+
+    it('END_OF_DAY absorbs the overrun above it: the next day starts on plan', () => {
+      // t1 is 15 minutes past its 10-minute slot. Without the marker t2 would
+      // chain off that overrun; the night swallows it instead.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = THREE_PM
+      const markers = [marker({ beforeTimerId: '2', time: new Date(THREE_PM + min(10)) })]
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM + min(25), null, {}, null, markers)
+      expect(ts[0].expected.finish).toBe(THREE_PM + min(25))
+      expect(ts[1].expected.start).toBe(ts[1].planned.start)
+      expect(ts[1].startDrift).toBe(0)
+    })
+
+    it('marker without a time: still cuts the rundown, but supplies no end to fill back from', () => {
+      timeset.timerId = null
+      const targetEnd = THREE_PM + min(90)
+      const markers = [marker({ time: null })]
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(60), null, {}, { frozen: targetEnd }, markers)
+      expect(ts.map(t => t.segmentIndex)).toEqual([0, 0, 1])
+      expect(ts[0].segmentEnd).toBeNull()
+      expect(ts[2].segmentEnd).toBe(targetEnd)
+      // The wall carries through: the whole plan still chains back off the target.
+      expect(ts[2].planned.finish).toBe(targetEnd)
+      expect(ts[0].planned.start).toBe(targetEnd - min(30))
+      expect(ts[0].backTime).toBe(ts[0].planned.start)
+    })
+
+    it('drops an anchor naming no cue in this rundown', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      const markers = [marker({ beforeTimerId: 'deleted', time: new Date(THREE_PM + min(25)) })]
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(30), null, {}, null, markers)
+      for (const t of ts) expect(t.segmentIndex).toBe(0)
+    })
+
+    it('keeps only the first marker at any one boundary', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      const markers = [
+        marker({ _id: 'm1', time: new Date(THREE_PM + min(25)) }),
+        marker({ _id: 'm2', time: new Date(THREE_PM + min(35)) }),
+      ]
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(30), null, {}, null, markers)
+      expect(ts.map(t => t.segmentIndex)).toEqual([0, 0, 1])
+      expect(ts[0].segmentEnd).toBe(THREE_PM + min(25))
+    })
+
+    it('null anchor: the marker sits below the last cue and closes the whole rundown', () => {
+      timers[0].startTime = new Date(THREE_PM)
+      const dayEnd = THREE_PM + min(40)
+      const markers = [marker({ beforeTimerId: null, time: new Date(dayEnd) })]
+      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(30), null, {}, { frozen: THREE_PM + min(90) }, markers)
+      for (const t of ts) {
+        expect(t.segmentIndex).toBe(0)
+        expect(t.segmentEnd).toBe(dayEnd)
+      }
+      expect(ts[2].backTime).toBe(dayEnd - min(10))
+    })
+
+    it("David's two-day show: Day 1 reads its own 13 minutes, Day 2 stays clean", () => {
+      // Day 1 (Aug 24): doors 19:00, keynote 19:30 which runs 28 minutes long,
+      // then a session hard-anchored at 20:45 — a 15-minute gap that eats 15 of
+      // the overrun and leaves 13 riding into the night. Day 1 ends 02:00.
+      // Day 2 (Aug 25): keynote 09:00, show ends 12:00.
+      const roomDate = '2026-08-24'
+      const at = (iso: string) => new Date(iso).getTime()
+      const dayEnd = at('2026-08-25T02:00:00.000Z')
+      const targetEnd = at('2026-08-25T12:00:00.000Z')
+      const cues: TimerInput[] = [
+        makeTimer({ _id: 'd1a', minutes: 30, startTime: new Date(at('2000-01-01T19:00:00.000Z')) }),
+        makeTimer({ _id: 'd1b', hours: 1, minutes: 0, startTime: new Date(at('2000-01-01T19:30:00.000Z')) }),
+        makeTimer({ _id: 'd1c', hours: 5, minutes: 15, startTime: new Date(at('2000-01-01T20:45:00.000Z')) }),
+        makeTimer({ _id: 'd2a', hours: 3, minutes: 0, startTime: new Date(at('2000-01-01T09:00:00.000Z')), startDatePlus: 1 }),
+      ]
+      const kickoff = at('2026-08-24T20:58:00.000Z')
+      const ts = createTimestamps(
+        cues,
+        makeTimeset({ timerId: 'd1c', running: true, kickoff, lastStop: kickoff }),
+        'UTC',
+        kickoff + min(2),
+        roomDate,
+        {
+          timers: {
+            d1a: { start: at('2026-08-24T19:00:00.000Z'), finish: at('2026-08-24T19:30:00.000Z'), elapsed: min(30) },
+            d1b: { start: at('2026-08-24T19:30:00.000Z'), finish: kickoff, elapsed: min(88) },
+          },
+        },
+        { time: new Date(at('2000-01-01T12:00:00.000Z')), datePlus: 1 },
+        [{ _id: 'm1', type: 'END_OF_DAY', time: new Date(at('2000-01-01T02:00:00.000Z')), datePlus: 1, beforeTimerId: 'd2a' }],
+      )
+      // Day 1 is measured against 02:00 and lands 13 minutes past it.
+      expect(ts[2].segmentIndex).toBe(0)
+      expect(ts[2].segmentEnd).toBe(dayEnd)
+      expect(ts[2].planned.finish).toBe(dayEnd)
+      expect(ts[2].expected.finish).toBe(dayEnd + min(13))
+      // Day 2 is measured against 12:00 and is not carrying Day 1's overrun.
+      expect(ts[3].segmentIndex).toBe(1)
+      expect(ts[3].segmentEnd).toBe(targetEnd)
+      expect(ts[3].expected.finish).toBe(targetEnd)
+      expect(ts[3].startDrift).toBe(0)
+    })
+  })
+
 })
 
 // The exported target resolver — same precedence + date placement the reverse
 // walk uses. Display layers call this to compare against the instant the walk
 // anchored on (e.g. the gap between the last planned finish and the target).
-describe('resolveTargetEnd', () => {
-  it('returns null for no target / empty target', () => {
-    expect(resolveTargetEnd(null)).toBeNull()
-    expect(resolveTargetEnd({})).toBeNull()
-    expect(resolveTargetEnd({ time: null, frozen: null })).toBeNull()
-  })
 
-  it('returns the frozen gray instant as-is', () => {
-    const frozen = THREE_PM + min(30)
-    expect(resolveTargetEnd({ frozen })).toBe(frozen)
-  })
-
-  it('white time wins over frozen and resolves onto roomDate + datePlus', () => {
-    const resolved = resolveTargetEnd(
-      { time: new Date('2022-01-01T01:30:00.000Z'), datePlus: 1, frozen: THREE_PM },
-      { timezone: 'UTC', roomDate: '2024-06-15' },
-    )
-    expect(resolved).toBe(new Date('2024-06-16T01:30:00.000Z').getTime())
-  })
-
-  it('matches the instant createTimestamps anchors the reverse walk on', () => {
+describe('resolveTargetEnd contract', () => {
+  it('resolves the same instant createTimestamps anchors the reverse walk on', () => {
     const timers = makeTimers()
     const timeset = makeTimeset({ kickoff: null })
     const target = { time: new Date('2022-01-01T18:00:00.000Z'), datePlus: 0 }
     const opts = { timezone: 'UTC', now: THREE_PM - min(30), roomDate: '2024-06-15' }
     const ts = createTimestamps(timers, timeset, opts.timezone, opts.now, opts.roomDate, {}, target)
-    expect(ts[2].planned.finish).toBe(resolveTargetEnd(target, opts))
+    expect(ts[2]!.planned.finish).toBe(resolveTargetEnd(target, opts))
   })
 })

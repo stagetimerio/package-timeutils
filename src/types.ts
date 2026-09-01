@@ -158,6 +158,28 @@ export interface TargetInput {
 }
 
 /**
+ * A row placed *between* cues, closing the stretch of rundown above it.
+ *
+ * `time` is a wall-clock Date whose date portion is ignored and re-placed on
+ * roomDate + `datePlus`, exactly like `TargetInput.time` and timer anchors.
+ * `beforeTimerId` names the cue the marker sits above; `null` pins it below
+ * the last cue. An anchor naming no cue in the list is dropped.
+ *
+ * `END_OF_DAY` is a full break: it seeds the reverse walk (rows above it back-
+ * time to it, not to the show target) *and* stops drift crossing it, so the
+ * first cue below starts from its own plan. Sleep absorbs the overrun.
+ */
+export interface MarkerInput {
+  _id: string
+  type: MarkerType
+  time?: Date | null
+  datePlus?: number
+  beforeTimerId?: string | null
+}
+
+export type MarkerType = 'END_OF_DAY'
+
+/**
  * Per-timer output of `createTimestamps`. All time fields are epoch ms.
  *
  * ## Three channels: `planned`, `expected`, `memory`
@@ -262,15 +284,31 @@ export interface Timestamp {
   liveGap: number | null
 
   /**
-   * Latest start that still lands the show on the target end — the plan timed
-   * backward from `targetEnd` through the same durations + gaps, which reduces
-   * to `planned.start` shifted by the plan-to-target headroom
-   * (`targetEnd - last.planned.finish`). No fixed target → headroom `0` →
-   * `backTime ≡ planned.start`. `null` when `planned.start` or the plan end is
-   * null. `expected.start - backTime` is the cue's over/under against the
-   * target (for the last cue, the show's).
+   * Latest start that still lands this row's *segment* on `segmentEnd` — the
+   * segment's plan timed backward through the same durations + gaps, which
+   * reduces to `planned.start` shifted by that segment's headroom
+   * (`segmentEnd - segment's last planned.finish`). No markers → one segment
+   * → the show target, as before. No declared end → headroom `0` →
+   * `backTime ≡ planned.start`. `null` when `planned.start` or the segment's
+   * plan end is null. `expected.start - backTime` is the cue's over/under
+   * against the end it is working toward.
    */
   backTime: number | null
+
+  /**
+   * Which segment this row belongs to — the stretch between two markers, or
+   * between a marker and an end of the rundown. `0` when there are no markers,
+   * so every reader can treat the rundown as one segment without branching.
+   */
+  segmentIndex: number
+
+  /**
+   * The declared end of this row's segment: the closing marker's resolved
+   * instant, or the show target for the last segment. `null` when that end
+   * isn't set. Identical for every row in a segment, and the instant
+   * `backTime` counts back from.
+   */
+  segmentEnd: number | null
 
   /**
    * This row is the front wall: its `planned.start` is pinned to the run's

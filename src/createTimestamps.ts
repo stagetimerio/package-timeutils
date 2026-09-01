@@ -1,13 +1,15 @@
 import { hmsToMilliseconds } from './hmsToMilliseconds'
 import { parseCalendarDay } from './parseCalendarDay'
-import { applyDate } from './applyDate'
-import { addDays } from 'date-fns/addDays'
-import { tz } from '@date-fns/tz'
+import { resolveAnchoredTime } from './timestamp-utils/resolveAnchoredTime'
+import { resolveMarkerBoundaries } from './timestamp-utils/resolveMarkerBoundaries'
+import { resolveTargetEnd } from './timestamp-utils/resolveTargetEnd'
+import { resolveSegments } from './timestamp-utils/resolveSegments'
 import type {
   TimerInput,
   TimesetInput,
   TimestampState,
   MemoryInput,
+  MarkerInput,
   TargetInput,
   Timestamp,
 } from './types'
@@ -133,6 +135,16 @@ const TIMESTAMP_STATE = {
  *   reverse walk from beyond the last row — trailing soft rows fill backward
  *   from it ("start here to land on target"). Forward-filled rows win as
  *   always.
+ * - **Markers cut the rundown into segments.** A marker sits above a cue
+ *   (`beforeTimerId`) and closes everything above it. Its resolved instant is
+ *   that segment's end — the reverse walk seeds from it exactly as the show
+ *   target seeds the last segment, so rows back-time to the end they are
+ *   actually working toward. A marker also stops drift crossing it: the first
+ *   cue below starts from its own plan instead of chaining off the overrun
+ *   above (the long break absorbs it, which is the whole point of declaring a
+ *   day). Markers with no `time` declare the boundary without
+ *   supplying an end: they still cut the segment, but the segment has no
+ *   goalpost to fill backward from, so the wall carries through.
  * - **`backTime` is backward timing from the target.** Per row, the latest
  *   start that still lands the show on `targetEnd`, walking the planned chain
  *   backward through the same durations + gaps. Because every planned row
@@ -151,6 +163,7 @@ export function createTimestamps (
   roomDate: string | null = null, // 'YYYY-MM-DD'
   memory: MemoryInput = {},
   target: TargetInput | null = null,
+  markers: MarkerInput[] = [],
 ): Timestamp[] {
   if (!Array.isArray(timers) || !timers.length) return []
   if (!timeset) return []
@@ -239,20 +252,47 @@ export function createTimestamps (
       gap: null,
       liveGap: null,
       backTime: null,
+      segmentIndex: 0,
+      segmentEnd: null,
       pinnedStart,
       explicitStart: !!timer.startTime,
       explicitFinish: timer.type === TIMER_TYPES.FINISH_TIME,
     })
   }
 
+  // --- Segments ----------------------------------------------------------
+  // Markers cut the rundown above the cue they anchor to; the show target
+  // closes the last piece. With no markers this is one segment and every rule
+  // below reduces to what it was before them.
+  const targetEnd: number | null = resolveTargetEnd(target, { timezone, now, roomDate })
+  const boundaries = resolveMarkerBoundaries(markers, timers, iRoomDate, timezone)
+  const { segments, segmentIndexByRow } = resolveSegments(boundaries, targetEnd, out.length)
+
+  // Both keyed by row, both sized by the number of day breaks rather than the
+  // number of cues — a rundown of 900 cues and one marker holds one entry each.
+  // The row that closes a segment back-times to that segment's own end (pass 2).
+  const wallResetAtRow = new Map<number, number>()
+  for (const { end, lastRow } of segments) {
+    if (end != null && lastRow >= 0) wallResetAtRow.set(lastRow, end)
+  }
+  // The row that opens one: the long break above it swallows the overrun, so
+  // the row starts from its own plan (pass 3).
+  const dayBreakAtRow = new Set<number>(
+    segments.slice(1).map((segment) => segment.firstRow).filter((row) => row >= 0),
+  )
+
   // --- Pass 2: reverse planned ------------------------------------------
   // Fill remaining null planned rows by walking backward from each downstream
-  // anchor. `wall` is the instant we step back from (next row's start). The
-  // resolved show target end acts as a virtual anchor past the last row.
-  const targetEnd: number | null = resolveTargetEnd(target, { timezone, now, roomDate })
-  let wall: number | null = targetEnd
+  // anchor. `wall` is the instant we step back from (next row's start). Each
+  // segment's declared end acts as a virtual anchor past its last row.
+  let wall: number | null = null
   for (let i = out.length - 1; i >= 0; i--) {
     const row = out[i]!
+
+    // This row closes a segment: back-time to that segment's own end, not to
+    // whatever the rows below are working toward.
+    const reset = wallResetAtRow.get(i)
+    if (reset != null) wall = reset
 
     // Forward already filled this row. Forward wins; row's start is the new
     // wall (an upstream hard anchor seeds its own backward run).
@@ -267,14 +307,15 @@ export function createTimestamps (
     wall = row.planned.start
   }
 
-  // Back-time headroom: how far the target sits past the plan's own end.
-  // Timing the plan backward from the target reuses the same durations + gaps,
-  // so per row `backTime = planned.start + headroom` (see the rule above). No
-  // fixed target → the plan end stands in → headroom 0 → backTime ≡ planned.start.
-  const plannedEnd: number | null = out[out.length - 1]!.planned.finish
-  const headroom: number | null = plannedEnd != null
-    ? (targetEnd ?? plannedEnd) - plannedEnd
-    : null
+  // Back-time headroom, per segment: how far a segment's declared end sits past
+  // its own plan end. Timing a segment backward reuses the same durations +
+  // gaps, so per row `backTime = planned.start + headroom` (see the rule
+  // above). No declared end → the plan end stands in → headroom 0 →
+  // backTime ≡ planned.start.
+  for (const segment of segments) {
+    const plannedEnd = segment.lastRow >= 0 ? out[segment.lastRow]!.planned.finish : null
+    segment.headroom = plannedEnd != null ? (segment.end ?? plannedEnd) - plannedEnd : null
+  }
 
   // --- Pass 3: expected + drift + gap + backTime -------------------------
   for (const [i, timer] of timers.entries()) {
@@ -311,7 +352,9 @@ export function createTimestamps (
       case TIMESTAMP_STATE.FUTURE:
         // Hard `startTime` honors the scheduled gap; chain forward only if
         // we've already overshot the anchor. Otherwise chain from prev.
-        if (timer.startTime && plannedStart) {
+        if (dayBreakAtRow.has(i) && plannedStart) {
+          expectedStart = plannedStart
+        } else if (timer.startTime && plannedStart) {
           expectedStart = prev?.expected.finish ? Math.max(plannedStart, prev.expected.finish) : plannedStart
         } else if (prev?.expected.finish) {
           expectedStart = prev.expected.finish
@@ -383,58 +426,13 @@ export function createTimestamps (
       row.liveGap = expectedStart != null ? expectedStart - prev.expected.finish : null
     }
 
+    const segmentIndex = segmentIndexByRow[i]!
+    const segment = segments[segmentIndex]!
+    const headroom = segment.headroom!
+    row.segmentIndex = segmentIndex
+    row.segmentEnd = segment.end ?? null
     row.backTime = headroom != null && plannedStart != null ? plannedStart + headroom : null
   }
 
   return out
-}
-
-/**
- * Resolve the show target end to an epoch-ms instant.
- *
- * Same precedence and date placement as `createTimestamps` uses internally
- * (this IS the function it calls): the user-set ("white") `target.time` is
- * placed on `roomDate + target.datePlus` in `timezone`, exactly like a timer
- * anchor, and wins over the kickoff-frozen ("gray") `target.frozen` instant.
- * Returns `null` when neither is set — the live-derived end is not a fixed
- * line, so there is nothing to resolve.
- *
- * Exported so display layers can compare the same instant the reverse walk
- * anchors on (e.g. the gap between the last timer's planned finish and the
- * target) without re-implementing the precedence rules.
- */
-export function resolveTargetEnd (
-  target: TargetInput | null,
-  {
-    timezone = undefined,
-    now = Date.now(),
-    roomDate = null,
-  }: {
-    timezone?: string
-    now?: number
-    roomDate?: string | null
-  } = {},
-): number | null {
-  if (target?.time) {
-    const iRoomDate = parseCalendarDay(roomDate, { timezone, now: new Date(now) })
-    return resolveAnchoredTime(target.time, iRoomDate, target.datePlus, timezone)
-  }
-  return target?.frozen ?? null
-}
-
-// --- Helpers -------------------------------------------------------------
-
-/**
- * Resolve a wall-clock anchor to epoch ms by placing the time-of-day from
- * `rawInput` on `roomDate + datePlus` in the target timezone.
- */
-function resolveAnchoredTime (
-  rawInput: Date,
-  roomDate: Date,
-  datePlus: number = 0,
-  timezone: string | undefined = 'UTC',
-): number {
-  const day = datePlus ? addDays(roomDate, datePlus, { in: tz(timezone) }) : roomDate
-  const result = applyDate(rawInput, day, timezone)
-  return result ? result.getTime() : 0
 }
