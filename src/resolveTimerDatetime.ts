@@ -2,17 +2,7 @@ import { applyDate } from './applyDate'
 import { parseCalendarDay } from './parseCalendarDay'
 
 /**
- * Place a timer's wall-clock time on the day it runs, returning the absolute
- * instant. The inverse of {@link deriveDatePlus}: a `startTime`/`finishTime`
- * stores only a time-of-day, and the day it belongs to lives in the room date
- * plus the timer's `startDatePlus`/`finishDatePlus` offset.
- *
- * ```
- * resolveTimerDatetime(timer.finishTime, room.date, {
- *   timezone: room.settings.timezone,
- *   datePlus: timer.finishDatePlus,
- * })
- * ```
+ * Place a wall-clock time on a calendar day, returning the absolute instant.
  *
  * ### Why not inline `applyDate(time, parseCalendarDay(...), timezone)`?
  * `timezone` has to reach both calls, and the trailing one is easy to drop.
@@ -24,19 +14,12 @@ import { parseCalendarDay } from './parseCalendarDay'
  *   is discarded. `null` (an unset time) returns `null`.
  * @param roomDate - `'YYYY-MM-DD'` or `null` for "today in `timezone`."
  * @param options.timezone - IANA timezone. Defaults to `'UTC'`.
- * @param options.datePlus - Days past `roomDate` the timer sits on.
  * @returns The resolved instant, or `null` if `time` is unset or unparseable.
  */
 export function resolveTimerDatetime (
   time: Date | string | null,
   roomDate: string | null = null,
-  {
-    timezone = undefined,
-    datePlus = 0,
-  }: {
-    timezone?: string
-    datePlus?: number
-  } = {},
+  { timezone = undefined }: { timezone?: string } = {},
 ): Date | null {
-  return applyDate(time, parseCalendarDay(roomDate, { timezone, datePlus }), timezone)
+  return applyDate(time, parseCalendarDay(roomDate, { timezone }), timezone)
 }

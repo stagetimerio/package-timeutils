@@ -32,23 +32,6 @@ describe('parseCalendarDay', () => {
       expect(parseCalendarDay('2026-04-18', { timezone: 'UTC' }).toISOString())
         .to.equal('2026-04-18T00:00:00.000Z')
     })
-
-    test('datePlus shifts forward', () => {
-      expect(parseCalendarDay('2026-04-18', { datePlus: 1 }).toISOString())
-        .to.equal('2026-04-19T00:00:00.000Z')
-      expect(parseCalendarDay('2026-04-18', { datePlus: 7 }).toISOString())
-        .to.equal('2026-04-25T00:00:00.000Z')
-    })
-
-    test('datePlus crosses month boundary', () => {
-      expect(parseCalendarDay('2026-01-31', { datePlus: 1 }).toISOString())
-        .to.equal('2026-02-01T00:00:00.000Z')
-    })
-
-    test('datePlus crosses year boundary', () => {
-      expect(parseCalendarDay('2026-12-31', { datePlus: 1 }).toISOString())
-        .to.equal('2027-01-01T00:00:00.000Z')
-    })
   })
 
   // -----------------------------------------------------------------
@@ -161,21 +144,6 @@ describe('parseCalendarDay', () => {
       expect(parseCalendarDay('2026-10-26', { timezone: 'Europe/Berlin' }).toISOString())
         .to.equal('2026-10-25T23:00:00.000Z')
     })
-
-    test('datePlus across spring-forward stays DST-safe', () => {
-      // Mar 28 + 1 = Mar 29 (still CET). Mar 29 + 1 = Mar 30 (CEST).
-      expect(parseCalendarDay('2026-03-28', { timezone: 'Europe/Berlin', datePlus: 1 }).toISOString())
-        .to.equal('2026-03-28T23:00:00.000Z')
-      expect(parseCalendarDay('2026-03-29', { timezone: 'Europe/Berlin', datePlus: 1 }).toISOString())
-        .to.equal('2026-03-29T22:00:00.000Z')
-    })
-
-    test('datePlus across fall-back stays DST-safe', () => {
-      expect(parseCalendarDay('2026-10-24', { timezone: 'Europe/Berlin', datePlus: 1 }).toISOString())
-        .to.equal('2026-10-24T22:00:00.000Z')
-      expect(parseCalendarDay('2026-10-25', { timezone: 'Europe/Berlin', datePlus: 1 }).toISOString())
-        .to.equal('2026-10-25T23:00:00.000Z')
-    })
   })
 
   // -----------------------------------------------------------------
@@ -206,12 +174,6 @@ describe('parseCalendarDay', () => {
       const now = new Date('2026-04-17T22:00:00.000Z')
       expect(parseCalendarDay(null, { timezone: 'Pacific/Kiritimati', now }).toISOString())
         .to.equal('2026-04-17T10:00:00.000Z')
-    })
-
-    test('null + datePlus', () => {
-      const now = new Date('2026-04-18T13:45:00.000Z')
-      expect(parseCalendarDay(null, { timezone: 'UTC', datePlus: 1, now }).toISOString())
-        .to.equal('2026-04-19T00:00:00.000Z')
     })
   })
 

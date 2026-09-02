@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { resolveTimerDatetime } from '../src/resolveTimerDatetime'
 import { parseCalendarDay } from '../src/parseCalendarDay'
-import { deriveDatePlus } from '../src/deriveDatePlus'
 import { applyDate } from '../src/applyDate'
 
 const HOUR = 3600_000
@@ -10,6 +9,13 @@ const HOUR = 3600_000
 function clockAt (instant: Date | null, timezone: string): string {
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).format(instant as Date)
+}
+
+/** Calendar day 'YYYY-MM-DD' a resolved instant falls on in `timezone`. */
+function dayAt (instant: Date | null, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(instant as Date)
 }
 
@@ -27,18 +33,11 @@ describe('resolveTimerDatetime', () => {
     expect(resolved?.getTime()).toBe(time.getTime())
   })
 
-  it('shifts by datePlus', () => {
-    const time = localTime('2026-07-22', 9.5, timezone)
-    const resolved = resolveTimerDatetime(time, '2026-07-22', { timezone, datePlus: 2 })
-    expect(clockAt(resolved, timezone)).toBe('09:30')
-    expect(deriveDatePlus(resolved as Date, '2026-07-22', { timezone })).toBe(2)
-  })
-
   it('keeps the local clock time, discarding the calendar day', () => {
     const time = localTime('2026-07-22', 9.5, timezone)
     const resolved = resolveTimerDatetime(time, '2026-09-04', { timezone })
     expect(clockAt(resolved, timezone)).toBe('09:30')
-    expect(deriveDatePlus(resolved as Date, '2026-09-04', { timezone })).toBe(0)
+    expect(dayAt(resolved, timezone)).toBe('2026-09-04')
   })
 
   it('preserves the local clock time across a DST boundary', () => {
@@ -57,10 +56,10 @@ describe('resolveTimerDatetime', () => {
     // previous UTC day for any zone ahead of UTC — so the cue lands a day early.
     const time = localTime('2026-07-22', 9.5, timezone)
     const halfZoned = applyDate(time, parseCalendarDay('2026-07-22', { timezone }))
-    expect(deriveDatePlus(halfZoned as Date, '2026-07-22', { timezone })).toBe(-1)
+    expect(dayAt(halfZoned, timezone)).toBe('2026-07-21')
 
     const resolved = resolveTimerDatetime(time, '2026-07-22', { timezone })
-    expect(deriveDatePlus(resolved as Date, '2026-07-22', { timezone })).toBe(0)
+    expect(dayAt(resolved, timezone)).toBe('2026-07-22')
   })
 
   it('returns null for an unset time', () => {
@@ -75,23 +74,21 @@ describe('resolveTimerDatetime', () => {
     const time = localTime('2026-07-22', 9.5, timezone)
     const resolved = resolveTimerDatetime(time, null, { timezone })
     expect(clockAt(resolved, timezone)).toBe('09:30')
-    expect(deriveDatePlus(resolved as Date, null, { timezone })).toBe(0)
+    expect(dayAt(resolved, timezone)).toBe(dayAt(new Date(), timezone))
   })
 
-  it('round-trips with deriveDatePlus across far-east zones', () => {
+  it('lands on the room date across far-east zones', () => {
     const zones = [
       'UTC', 'America/Los_Angeles', 'Europe/Berlin', 'Australia/Sydney',
       'Pacific/Auckland', 'Pacific/Chatham', 'Pacific/Apia', 'Pacific/Kiritimati',
     ]
     for (const zone of zones) {
-      for (const datePlus of [-1, 0, 1, 3]) {
-        for (const hours of [0, 9.5, 23.5]) {
-          const time = localTime('2026-07-22', hours, zone)
-          const resolved = resolveTimerDatetime(time, '2026-07-22', { timezone: zone, datePlus })
-          const label = `${zone} +${datePlus} @${hours}`
-          expect(deriveDatePlus(resolved as Date, '2026-07-22', { timezone: zone }), label).toBe(datePlus)
-          expect(clockAt(resolved, zone), label).toBe(clockAt(time, zone))
-        }
+      for (const hours of [0, 9.5, 23.5]) {
+        const time = localTime('2026-07-20', hours, zone)
+        const resolved = resolveTimerDatetime(time, '2026-07-22', { timezone: zone })
+        const label = `${zone} @${hours}`
+        expect(dayAt(resolved, zone), label).toBe('2026-07-22')
+        expect(clockAt(resolved, zone), label).toBe(clockAt(time, zone))
       }
     }
   })

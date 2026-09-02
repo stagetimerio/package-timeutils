@@ -1,5 +1,12 @@
-import { resolveAnchoredTime } from './resolveAnchoredTime'
 import type { MarkerInput, TimerInput } from '../types'
+
+export interface Boundary {
+  markerId: string
+  /** Row the marker sits above; `timers.length` for one pinned below the last cue. */
+  index: number
+  /** The typed end, still a time-of-day. Resolved by the forward pass, in list order. */
+  time: Date | null
+}
 
 /**
  * Turn markers into row-index boundaries, in list order.
@@ -12,13 +19,11 @@ import type { MarkerInput, TimerInput } from '../types'
 export function resolveMarkerBoundaries (
   markers: MarkerInput[],
   timers: TimerInput[],
-  roomDate: Date,
-  timezone: string | undefined,
-): { index: number, end: number | null }[] {
+): Boundary[] {
   if (!Array.isArray(markers) || !markers.length) return []
 
   const indexById = new Map(timers.map((t, i) => [String(t._id), i]))
-  const boundaries: { index: number, end: number | null }[] = []
+  const boundaries: Boundary[] = []
   const taken = new Set<number>()
 
   for (const marker of markers) {
@@ -27,10 +32,7 @@ export function resolveMarkerBoundaries (
       : indexById.get(String(marker.beforeTimerId))
     if (index === undefined || taken.has(index)) continue
     taken.add(index)
-    boundaries.push({
-      index,
-      end: marker.time ? resolveAnchoredTime(marker.time, roomDate, marker.datePlus, timezone) : null,
-    })
+    boundaries.push({ markerId: marker._id, index, time: marker.time ?? null })
   }
 
   return boundaries.sort((a, b) => a.index - b.index)

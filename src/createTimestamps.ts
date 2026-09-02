@@ -3,15 +3,18 @@ import { parseCalendarDay } from './parseCalendarDay'
 import { resolveAnchoredTime } from './timestamp-utils/resolveAnchoredTime'
 import { resolveMarkerBoundaries } from './timestamp-utils/resolveMarkerBoundaries'
 import { resolveTargetEnd } from './timestamp-utils/resolveTargetEnd'
-import { resolveSegments } from './timestamp-utils/resolveSegments'
+import { resolveSegments, type Segment } from './timestamp-utils/resolveSegments'
 import type {
   TimerInput,
   TimesetInput,
   TimestampState,
   MemoryInput,
   MarkerInput,
+  BoundaryTimestamp,
+  MarkerTimestamp,
   TargetInput,
   Timestamp,
+  Timestamps,
 } from './types'
 
 // --- Constants -----------------------------------------------------------
@@ -34,8 +37,12 @@ const TIMESTAMP_STATE = {
  * Builds planned + expected timestamp chain for a list of timers.
  *
  * You give it a rundown — a list of timers, plus what's currently running
- * (`timeset`), the room's date, the timezone, and any memory of past runs.
- * It returns one row per timer with two parallel timelines plus the facts:
+ * (`timeset`), the room's date, the timezone, any memory of past runs, the
+ * show target and the day-break markers. It returns `timestamps`, one row per
+ * timer in list order; `markers`, one per marker in input order; and `target`,
+ * the show end as the boundary closing the last segment (see
+ * `BoundaryTimestamp` in `./types`). Each timer row has two parallel timelines
+ * plus the facts:
  *
  *   - **planned** — pure schedule. What the rundown says.
  *   - **expected** — reality where known, projection where not: history (PAST),
@@ -122,15 +129,26 @@ const TIMESTAMP_STATE = {
  * - **Drift / gap inherit nulls.** `startDrift` / `finishDrift` / `gap` are
  *   `null` when either endpoint of the subtraction is null. `gap` is `0` for
  *   the first row by convention.
- * - **One canonical day.** All wall-clock anchors (`startTime` / `finishTime`)
- *   are placed on `roomDate + datePlus` in `timezone`. No prev-finish
- *   compensation, no "today" guessing — every anchor has a fully determined
- *   calendar day.
+ * - **The rundown never runs backwards.** A typed time (`startTime`,
+ *   `finishTime`, a marker's `time`, `target.time`) is a time-of-day; the
+ *   calendar day it lands on follows from its position, never from the input.
+ *   Every typed time resolves to the first occurrence of that time-of-day, in
+ *   `timezone`, at or after its anchor: the start of its segment, which is the
+ *   segment's first cue's resolved start (the previous finish when that cue is
+ *   soft). So a cue typed earlier than the day's first cue rolls to the next
+ *   day, and a closing marker can never land before the cues it closes. Until
+ *   a segment has a start, typed times look from its entry: room date
+ *   midnight for the first segment (today's midnight in a dateless room), then
+ *   the previous marker's instant, or the previous finish under an untyped
+ *   marker. Anchoring on the segment's *start* and not on the previous row is
+ *   deliberate: a cue planned past the day's end shows as an overlap instead of
+ *   silently rolling onto the next day. Resolution is therefore order-
+ *   dependent — a typed start depends on the rows above it.
  * - **Strict input shapes.** Callers normalize: `startTime` / `finishTime` are
  *   `Date | null`, `kickoff` etc. are epoch ms. Library does no parsing of
  *   ISO strings or wall-clock formats.
  * - **`target` is a virtual show-end anchor.** The user-set `target.time`
- *   (resolved onto roomDate + `target.datePlus`, like any timer anchor) wins
+ *   (resolved at or after the last segment's start, like any typed time) wins
  *   over the kickoff-frozen `target.frozen`. The resolved instant seeds the
  *   reverse walk from beyond the last row — trailing soft rows fill backward
  *   from it ("start here to land on target"). Forward-filled rows win as
@@ -145,15 +163,6 @@ const TIMESTAMP_STATE = {
  *   day). Markers with no `time` declare the boundary without
  *   supplying an end: they still cut the segment, but the segment has no
  *   goalpost to fill backward from, so the wall carries through.
- * - **`backTime` is backward timing from the target.** Per row, the latest
- *   start that still lands the show on `targetEnd`, walking the planned chain
- *   backward through the same durations + gaps. Because every planned row
- *   satisfies `finish = start + duration` and gaps are the residuals between
- *   rows, that walk telescopes to a uniform shift:
- *   `backTime = planned.start + (targetEnd − plannedEnd)` — scheduled gaps
- *   survive by construction. No fixed target → the plan's own end stands in
- *   (shift 0, `backTime ≡ planned.start`). Unknown plan end or null
- *   `planned.start` → `null`.
  */
 export function createTimestamps (
   timers: TimerInput[],
@@ -164,12 +173,13 @@ export function createTimestamps (
   memory: MemoryInput = {},
   target: TargetInput | null = null,
   markers: MarkerInput[] = [],
-): Timestamp[] {
-  if (!Array.isArray(timers) || !timers.length) return []
-  if (!timeset) return []
+): Timestamps {
+  if (!Array.isArray(timers) || !timers.length || !timeset) {
+    return { timestamps: [], markers: markers.map((marker) => unplacedMarker(marker)), target: emptyBoundary() }
+  }
 
   // 00:00 local time in `timezone` on the room's date (or today if none).
-  const iRoomDate: Date = parseCalendarDay(roomDate, { timezone, now: new Date(now) })
+  const roomMidnight: number = parseCalendarDay(roomDate, { timezone, now: new Date(now) }).getTime()
   const kickoffMs: number | null = timeset.kickoff
   const activeIdx: number = timeset.timerId
     ? timers.findIndex(t => String(t._id) === String(timeset.timerId))
@@ -195,78 +205,100 @@ export function createTimestamps (
   // list, so ghosts never hold the wall.
   const wallIdx: number = timers.findIndex(t => memory.timers?.[String(t._id)]?.start != null)
 
-  const out: Timestamp[] = []
-
-  // --- Pass 1: forward planned + static fields ---------------------------
-  // Walk the rundown, push a partial Timestamp with `planned` and the fields
-  // that depend only on (timer, timeset): state, memory, explicit flags.
-  // `expected`, drift, and gap are filled in pass 3.
-  for (const [i, timer] of timers.entries()) {
-    const prev = out[i - 1]
-    const mem = memory.timers?.[String(timer._id)] ?? null
-
-    let state: TimestampState
-    if (i < activeIdx) state = TIMESTAMP_STATE.PAST
-    else if (i === activeIdx && !activeIsArmed) state = TIMESTAMP_STATE.ACTIVE
-    else state = TIMESTAMP_STATE.FUTURE // after the active cue, or the active cue while merely armed
-
-    let plannedStart: number | null = null
-    let plannedFinish: number | null = null
-    let plannedDuration = 0
-
-    if (timer.startTime) plannedStart = resolveAnchoredTime(timer.startTime, iRoomDate, timer.startDatePlus, timezone)
-    else if (prev?.planned.finish) plannedStart = prev.planned.finish
-
-    if (timer.type === TIMER_TYPES.FINISH_TIME) {
-      if (timer.finishTime) plannedFinish = resolveAnchoredTime(timer.finishTime, iRoomDate, timer.finishDatePlus, timezone)
-
-      if (plannedStart && plannedFinish) {
-        plannedDuration = plannedFinish - plannedStart
-      } else if (plannedFinish) {
-        plannedDuration = hmsToMilliseconds(timer)
-        plannedStart = plannedFinish - plannedDuration
-      }
-    } else {
-      plannedDuration = hmsToMilliseconds(timer)
-      if (plannedStart) plannedFinish = plannedStart + plannedDuration
-    }
-
-    // Front wall pin — after the type blocks so every planning source (own
-    // startTime, upstream chain, finishTime − duration) has had its say.
-    // Fact fills the hole; it never overrides planning.
-    let pinnedStart = false
-    if (plannedStart == null && i === wallIdx && mem?.start != null) {
-      plannedStart = mem.start
-      plannedFinish = plannedStart + plannedDuration
-      pinnedStart = true
-    }
-
-    out.push({
-      timerId: timer._id,
-      state,
-      planned: { start: plannedStart, finish: plannedFinish, duration: plannedDuration },
-      expected: { start: null, finish: null, duration: 0 },
-      memory: mem,
-      startDrift: null,
-      finishDrift: null,
-      gap: null,
-      liveGap: null,
-      backTime: null,
-      segmentIndex: 0,
-      segmentEnd: null,
-      pinnedStart,
-      explicitStart: !!timer.startTime,
-      explicitFinish: timer.type === TIMER_TYPES.FINISH_TIME,
-    })
-  }
-
   // --- Segments ----------------------------------------------------------
   // Markers cut the rundown above the cue they anchor to; the show target
   // closes the last piece. With no markers this is one segment and every rule
-  // below reduces to what it was before them.
-  const targetEnd: number | null = resolveTargetEnd(target, { timezone, now, roomDate })
-  const boundaries = resolveMarkerBoundaries(markers, timers, iRoomDate, timezone)
-  const { segments, segmentIndexByRow } = resolveSegments(boundaries, targetEnd, out.length)
+  // below reduces to what it was before them. Ends are filled by pass 1.
+  const boundaries = resolveMarkerBoundaries(markers, timers)
+  const { segments } = resolveSegments(boundaries, timers.length)
+
+  const out: Timestamp[] = []
+
+  // --- Pass 1: forward planned + static fields ---------------------------
+  // Walk the rundown one segment at a time, push a partial Timestamp with
+  // `planned` and the fields that depend only on (timer, timeset): state,
+  // memory, explicit flags. `expected`, drift, and gap are filled in pass 3.
+  //
+  // `entry` is where a segment's first typed time is looked for (see the rule
+  // above). The first resolved start becomes the anchor for every typed time
+  // left in the segment, the closing marker included.
+  let entry: number = roomMidnight
+  for (const [s, segment] of segments.entries()) {
+    let segmentStart: number | null = null
+
+    for (let i = segment.firstRow; i >= 0 && i <= segment.lastRow; i++) { // -1/-1 is an empty segment
+      const timer = timers[i]!
+      const prev = out[i - 1]
+      const mem = memory.timers?.[String(timer._id)] ?? null
+
+      let state: TimestampState
+      if (i < activeIdx) state = TIMESTAMP_STATE.PAST
+      else if (i === activeIdx && !activeIsArmed) state = TIMESTAMP_STATE.ACTIVE
+      else state = TIMESTAMP_STATE.FUTURE // after the active cue, or the active cue while merely armed
+
+      let plannedStart: number | null = null
+      let plannedFinish: number | null = null
+      let plannedDuration = 0
+
+      // The first resolved start becomes the segment's, so a first cue's own
+      // finish already counts from its start.
+      if (timer.startTime) plannedStart = resolveAnchoredTime(timer.startTime, segmentStart ?? entry, timezone)
+      else if (prev?.planned.finish) plannedStart = prev.planned.finish
+      segmentStart ??= plannedStart
+
+      if (timer.type === TIMER_TYPES.FINISH_TIME) {
+        if (timer.finishTime) plannedFinish = resolveAnchoredTime(timer.finishTime, segmentStart ?? entry, timezone)
+
+        if (plannedStart && plannedFinish) {
+          plannedDuration = plannedFinish - plannedStart
+        } else if (plannedFinish) {
+          plannedDuration = hmsToMilliseconds(timer)
+          plannedStart = plannedFinish - plannedDuration
+        }
+      } else {
+        plannedDuration = hmsToMilliseconds(timer)
+        if (plannedStart) plannedFinish = plannedStart + plannedDuration
+      }
+
+      // Front wall pin — after the type blocks so every planning source (own
+      // startTime, upstream chain, finishTime − duration) has had its say.
+      // Fact fills the hole; it never overrides planning.
+      let pinnedStart = false
+      if (plannedStart == null && i === wallIdx && mem?.start != null) {
+        plannedStart = mem.start
+        plannedFinish = plannedStart + plannedDuration
+        pinnedStart = true
+      }
+
+      out.push({
+        timerId: timer._id,
+        state,
+        planned: { start: plannedStart, finish: plannedFinish, duration: plannedDuration },
+        expected: { start: null, finish: null, duration: 0 },
+        memory: mem,
+        startDrift: null,
+        finishDrift: null,
+        gap: null,
+        liveGap: null,
+        segmentIndex: s,
+        segmentEnd: null,
+        pinnedStart,
+        explicitStart: !!timer.startTime,
+        explicitFinish: timer.type === TIMER_TYPES.FINISH_TIME,
+      })
+
+      segmentStart ??= plannedStart
+    }
+
+    const anchor = segmentStart ?? entry
+    const closing = boundaries[s]
+    if (closing) {
+      segment.end = closing.time ? resolveAnchoredTime(closing.time, anchor, timezone) : null
+      entry = segment.end ?? out[segment.lastRow]?.planned.finish ?? entry
+    } else {
+      segment.end = resolveTargetEnd(target, anchor, timezone)
+    }
+  }
 
   // Both keyed by row, both sized by the number of day breaks rather than the
   // number of cues — a rundown of 900 cues and one marker holds one entry each.
@@ -307,17 +339,7 @@ export function createTimestamps (
     wall = row.planned.start
   }
 
-  // Back-time headroom, per segment: how far a segment's declared end sits past
-  // its own plan end. Timing a segment backward reuses the same durations +
-  // gaps, so per row `backTime = planned.start + headroom` (see the rule
-  // above). No declared end → the plan end stands in → headroom 0 →
-  // backTime ≡ planned.start.
-  for (const segment of segments) {
-    const plannedEnd = segment.lastRow >= 0 ? out[segment.lastRow]!.planned.finish : null
-    segment.headroom = plannedEnd != null ? (segment.end ?? plannedEnd) - plannedEnd : null
-  }
-
-  // --- Pass 3: expected + drift + gap + backTime -------------------------
+  // --- Pass 3: expected + drift + gap ----------------------------------------
   for (const [i, timer] of timers.entries()) {
     const row = out[i]!
     const prev = out[i - 1]
@@ -426,13 +448,39 @@ export function createTimestamps (
       row.liveGap = expectedStart != null ? expectedStart - prev.expected.finish : null
     }
 
-    const segmentIndex = segmentIndexByRow[i]!
-    const segment = segments[segmentIndex]!
-    const headroom = segment.headroom!
-    row.segmentIndex = segmentIndex
-    row.segmentEnd = segment.end ?? null
-    row.backTime = headroom != null && plannedStart != null ? plannedStart + headroom : null
+    row.segmentEnd = segments[row.segmentIndex]!.end
   }
 
-  return out
+  // --- Boundaries: markers and the target, read off each segment's last cue --
+  const boundaryOf = (segment: Segment): BoundaryTimestamp => {
+    const last = out[segment.lastRow]
+    const landing = last?.planned.finish ?? null
+    const plannedEnd = segment.end ?? landing
+    const expectedEnd = last?.expected.finish ?? plannedEnd
+    return {
+      planned: { end: plannedEnd },
+      expected: { end: expectedEnd },
+      fixedEnd: segment.end != null,
+      gap: segment.end != null && landing != null ? segment.end - landing : null,
+      drift: expectedEnd != null && plannedEnd != null ? expectedEnd - plannedEnd : null,
+    }
+  }
+
+  // Boundary s closes segment s; markers that placed no boundary stay unplaced.
+  const segmentByMarkerId = new Map(boundaries.map((boundary, s) => [String(boundary.markerId), s]))
+  const markersOut: MarkerTimestamp[] = markers.map((marker) => {
+    const s = segmentByMarkerId.get(String(marker._id))
+    if (s === undefined) return unplacedMarker(marker)
+    return { markerId: marker._id, index: boundaries[s]!.index, segmentIndex: s, ...boundaryOf(segments[s]!) }
+  })
+
+  return { timestamps: out, markers: markersOut, target: boundaryOf(segments[segments.length - 1]!) }
+}
+
+function emptyBoundary (): BoundaryTimestamp {
+  return { planned: { end: null }, expected: { end: null }, fixedEnd: false, gap: null, drift: null }
+}
+
+function unplacedMarker (marker: MarkerInput): MarkerTimestamp {
+  return { markerId: marker._id, index: null, segmentIndex: null, ...emptyBoundary() }
 }

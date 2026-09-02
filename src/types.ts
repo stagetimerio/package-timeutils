@@ -93,9 +93,7 @@ export interface TimerInput {
   minutes: number
   seconds: number
   startTime: Date | null
-  startDatePlus: number
   finishTime: Date | null
-  finishDatePlus: number
 }
 
 /**
@@ -147,23 +145,32 @@ export interface MemoryInput {
  * Show target end input for `createTimestamps` — the resolvable goalpost.
  *
  * `time` is the user-set ("white") target: a wall-clock Date whose date
- * portion is ignored and re-placed on roomDate + `datePlus`, exactly like
- * timer start/finish anchors. `frozen` is the kickoff-frozen derived end
+ * portion is ignored — it lands at or after the last segment's start, exactly
+ * like timer start/finish anchors. `frozen` is the kickoff-frozen derived end
  * ("gray"), already an epoch-ms instant. `time` wins when both are set.
  */
 export interface TargetInput {
   time?: Date | null
-  datePlus?: number
   frozen?: number | null
 }
 
 /**
  * A row placed *between* cues, closing the stretch of rundown above it.
  *
- * `time` is a wall-clock Date whose date portion is ignored and re-placed on
- * roomDate + `datePlus`, exactly like `TargetInput.time` and timer anchors.
- * `beforeTimerId` names the cue the marker sits above; `null` pins it below
- * the last cue. An anchor naming no cue in the list is dropped.
+ * Two words for two things: a *marker* is the row the user places, a *segment*
+ * is the stretch of cues between markers (or between a marker and an end of
+ * the rundown). Rows belong to a segment, a marker closes one, and
+ * `segmentIndex` on both `Timestamp` and `MarkerTimestamp` is the link. A
+ * *boundary* is whatever closes a segment — a marker, or the show target for
+ * the last one — and both report the same `BoundaryTimestamp` shape. A segment
+ * is usually a show day but isn't called one, because nothing caps its length
+ * at 24h.
+ *
+ * `time` is a wall-clock Date whose date portion is ignored — it lands at or
+ * after the start of the segment it closes, exactly like `TargetInput.time`
+ * and timer anchors. `beforeTimerId` names the cue the marker sits above;
+ * `null` pins it below the last cue. An anchor naming no cue in the list is
+ * dropped.
  *
  * `END_OF_DAY` is a full break: it seeds the reverse walk (rows above it back-
  * time to it, not to the show target) *and* stops drift crossing it, so the
@@ -173,7 +180,6 @@ export interface MarkerInput {
   _id: string
   type: MarkerType
   time?: Date | null
-  datePlus?: number
   beforeTimerId?: string | null
 }
 
@@ -284,18 +290,6 @@ export interface Timestamp {
   liveGap: number | null
 
   /**
-   * Latest start that still lands this row's *segment* on `segmentEnd` — the
-   * segment's plan timed backward through the same durations + gaps, which
-   * reduces to `planned.start` shifted by that segment's headroom
-   * (`segmentEnd - segment's last planned.finish`). No markers → one segment
-   * → the show target, as before. No declared end → headroom `0` →
-   * `backTime ≡ planned.start`. `null` when `planned.start` or the segment's
-   * plan end is null. `expected.start - backTime` is the cue's over/under
-   * against the end it is working toward.
-   */
-  backTime: number | null
-
-  /**
    * Which segment this row belongs to — the stretch between two markers, or
    * between a marker and an end of the rundown. `0` when there are no markers,
    * so every reader can treat the rundown as one segment without branching.
@@ -305,8 +299,7 @@ export interface Timestamp {
   /**
    * The declared end of this row's segment: the closing marker's resolved
    * instant, or the show target for the last segment. `null` when that end
-   * isn't set. Identical for every row in a segment, and the instant
-   * `backTime` counts back from.
+   * isn't set. Identical for every row in a segment.
    */
   segmentEnd: number | null
 
@@ -324,4 +317,54 @@ export interface Timestamp {
 
   /** Timer is `FINISH_TIME` — wall-clock anchored finish, drift-absorbing. */
   explicitFinish: boolean
+}
+
+/**
+ * A boundary — an End of Day marker or the show target — as `createTimestamps`
+ * sees it. Same channels as a row: `planned` is the schedule, `expected` is
+ * reality where known and projection where not. Both are read off the last
+ * cue of the segment the boundary closes.
+ */
+export interface BoundaryTimestamp {
+  /**
+   * The end the segment measures against: the typed time (or the target's
+   * kickoff-frozen end) when there is one, else where the plan lands the last
+   * cue. Null only when nothing in the segment resolves.
+   */
+  planned: { end: number | null }
+
+  /** Where the segment actually lands: the last cue's `expected.finish`. Mirrors `planned` until known better. */
+  expected: { end: number | null }
+
+  /** True when `planned.end` is a commitment — typed, or the target's frozen end — rather than the plan's own landing. */
+  fixedEnd: boolean
+
+  /** `planned.end` minus where the plan lands the last cue: slack (+) or overrun (−) against a fixed end. Null unless fixed. */
+  gap: number | null
+
+  /** `expected.end` minus `planned.end`: over (+) or under (−). Null when either is unknown. */
+  drift: number | null
+}
+
+/**
+ * Per-marker output of `createTimestamps`, in input order: `markers[i]`
+ * answers for the `i`th `MarkerInput`. A marker that names no cue in the list,
+ * or doubles another marker's boundary, keeps its slot with every field null.
+ */
+export interface MarkerTimestamp extends BoundaryTimestamp {
+  /** Marker's `_id`, passed through from input. */
+  markerId: string
+
+  /** Row the marker sits above; `timers.length` for one pinned below the last cue. */
+  index: number | null
+
+  /** The segment this marker closes — the `segmentIndex` of the rows above it. */
+  segmentIndex: number | null
+}
+
+export interface Timestamps {
+  timestamps: Timestamp[]
+  markers: MarkerTimestamp[]
+  /** The show target, closing the last segment. Always present, whether or not a `TargetInput` was given. */
+  target: BoundaryTimestamp
 }
