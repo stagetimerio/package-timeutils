@@ -164,15 +164,15 @@ const TIMESTAMP_STATE = {
  *   actually working toward. Markers with no `time` declare the boundary
  *   without supplying an end: the segment above has no goalpost to fill
  *   backward from.
- * - **Every marker is a wall, typed or not.** A day end says nothing about
- *   when the next day starts, so nothing crosses a marker in either
- *   direction: no forward chain, no reverse fill, no `expected` projection.
- *   Each segment anchors itself the way a whole rundown does — a typed first
- *   cue times forward, a typed end (its own marker, or the target) times
- *   backward, a typed middle cue both ways — and with nothing typed every
- *   row in it stays null and the marker closing it has no end. The overrun
- *   above a marker is the night's to absorb: the first cue below starts from
- *   its own plan.
+ * - **Every segment is a little room.** A marker is a wall, typed or not:
+ *   a day end says nothing about when the next day starts, so nothing
+ *   crosses it in either direction — no forward chain, no reverse fill, no
+ *   `expected` projection. Inside its walls a segment times itself exactly
+ *   like a room with no markers at all: a typed first cue times forward, a
+ *   typed end (its own marker, or the target) times backward, a typed middle
+ *   cue both ways, and with nothing typed every row stays null and the
+ *   marker closing it has no end. The overrun above a marker is the night's
+ *   to absorb: the first cue below starts from its own plan.
  */
 export function createTimestamps (
   timers: TimerInput[],
@@ -238,7 +238,7 @@ export function createTimestamps (
 
     for (let i = segment.firstRow; i >= 0 && i <= segment.lastRow; i++) { // -1/-1 is an empty segment
       const timer = timers[i]!
-      // A marker is a wall: the cue below it has nothing to chain off.
+      // A marker is a wall of the little room: the cue below it has nothing to chain off.
       const prev: Timestamp | undefined = i === segment.firstRow ? undefined : out[i - 1]
       const mem = memory.timers?.[String(timer._id)] ?? null
 
@@ -314,7 +314,7 @@ export function createTimestamps (
   // Both keyed by row, both sized by the number of day breaks rather than the
   // number of cues — a rundown of 900 cues and one marker holds one entry each.
   // The row that closes a segment back-times to that segment's own end, or to
-  // nothing when it has none: the walk never crosses a marker (pass 2).
+  // nothing when it has none: the walk never leaves the little room (pass 2).
   const wallResetAtRow = new Map<number, number | null>()
   for (const { end, lastRow } of segments) {
     if (lastRow >= 0) wallResetAtRow.set(lastRow, end)

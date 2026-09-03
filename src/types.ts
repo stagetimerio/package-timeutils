@@ -172,10 +172,11 @@ export interface TargetInput {
  * `null` pins it below the last cue. An anchor naming no cue in the list is
  * dropped.
  *
- * `END_OF_DAY` is a wall, with or without a `time`. Nothing crosses it in
- * either direction: rows above back-time to it (not to the show target), rows
- * below never chain off it, and drift stops at it. The segment below anchors
- * itself like a rundown of its own, or has no times at all until one is typed.
+ * `END_OF_DAY` is a wall, with or without a `time`, and the segments on either
+ * side are little rooms. Nothing crosses the wall: rows above back-time to it
+ * (not to the show target), rows below never chain off it, drift stops at it.
+ * Each little room times itself the way a whole room does, and one with
+ * nothing typed has no times at all until someone types one.
  */
 export interface MarkerInput {
   _id: string
