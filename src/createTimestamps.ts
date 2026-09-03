@@ -133,13 +133,16 @@ const TIMESTAMP_STATE = {
  *   `finishTime`, a marker's `time`, `target.time`) is a time-of-day; the
  *   calendar day it lands on follows from its position, never from the input.
  *   Every typed time resolves to the first occurrence of that time-of-day, in
- *   `timezone`, at or after its anchor: the start of its segment, which is the
- *   segment's first cue's resolved start. So a cue typed earlier than the
- *   day's first cue rolls to the next day, and a closing marker can never land
- *   before the cues it closes. Until a segment has a start, typed times look
- *   from its entry: room date midnight for the first segment (today's midnight
- *   in a dateless room), then the previous marker's instant, or the previous
- *   finish under an untyped marker. A soft first cue starts at that entry too:
+ *   `timezone`, after its anchor: the start of its segment, which is the
+ *   segment's first cue's resolved start. A cue may land on the start itself;
+ *   a closing marker or the target lands strictly after it, since a day cannot
+ *   end when it begins — two day ends typed the same time are 24 hours apart.
+ *   So a cue typed earlier than the day's first cue rolls to the next day, and
+ *   a closing marker can never land before the cues it closes. Until a
+ *   segment has a start, typed times look from its entry: room date midnight
+ *   for the first segment (today's midnight in a dateless room), then the
+ *   previous marker's instant, or the previous finish under an untyped
+ *   marker. A soft first cue starts at that entry too:
  *   a day opens where the last one was declared to end, never before it, and
  *   an overrun above the marker is the night's to absorb. Under an untyped
  *   marker the entry is the previous finish, so the chain simply continues.
@@ -299,7 +302,7 @@ export function createTimestamps (
     const anchor = segmentStart ?? entry
     const closing = boundaries[s]
     if (closing) {
-      segment.end = closing.time ? resolveAnchoredTime(closing.time, anchor, timezone) : null
+      segment.end = closing.time ? resolveAnchoredTime(closing.time, anchor, timezone, { after: true }) : null
       entry = segment.end ?? out[segment.lastRow]?.planned.finish ?? entry
       entryIsDayEnd = segment.end != null
     } else {

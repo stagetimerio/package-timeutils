@@ -15,6 +15,13 @@ describe('resolveAnchoredTime', () => {
       .toBe(at('2024-06-15T09:30:00.000Z'))
   })
 
+  it('`after`: an exact hit on the anchor rolls a full day', () => {
+    expect(resolveAnchoredTime(tod('2022-01-01T09:30:00.000Z'), at('2024-06-15T09:30:00.000Z'), 'UTC', { after: true }))
+      .toBe(at('2024-06-16T09:30:00.000Z'))
+    expect(resolveAnchoredTime(tod('2022-01-01T09:31:00.000Z'), at('2024-06-15T09:30:00.000Z'), 'UTC', { after: true }))
+      .toBe(at('2024-06-15T09:31:00.000Z'))
+  })
+
   it('rolls to the next day when the time of day has already passed on the anchor day', () => {
     expect(resolveAnchoredTime(tod('2022-01-01T02:00:00.000Z'), at('2024-06-15T22:00:00.000Z'), 'UTC'))
       .toBe(at('2024-06-16T02:00:00.000Z'))

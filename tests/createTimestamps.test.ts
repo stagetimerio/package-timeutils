@@ -915,6 +915,32 @@ describe('createTimestamps', () => {
       expect(ts2[2].planned.start).toBe(at('2026-09-04T02:05:00.000Z'))
     })
 
+    it('a day cannot end when it begins: two day ends typed the same time are 24h apart', () => {
+      const markers = [eod('m1', '01:30', '2'), eod('m2', '01:30', '3')]
+      const ts = plan([cue('1', '21:00', 0, 30), cue('2', null, 0, 35), cue('3', null, 0, 10)], null, markers)
+      expect(ts[0].segmentEnd).toBe(at('2026-09-04T01:30:00.000Z'))
+      expect(ts[1].planned.start).toBe(at('2026-09-04T01:30:00.000Z'))
+      expect(ts[1].segmentEnd).toBe(at('2026-09-05T01:30:00.000Z'))
+      expect(ts[2].planned.start).toBe(at('2026-09-05T01:30:00.000Z'))
+    })
+
+    it('the next day\'s end lands within 24h of its start: later on the clock stays, earlier rolls', () => {
+      const day2 = (end: string) => plan([cue('1', '21:00', 0, 30), cue('2', null, 0, 35)], null, [eod('m1', '03:00', '2'), eod('m2', end, null)])[1].segmentEnd
+      expect(day2('22:00')).toBe(at('2026-09-04T22:00:00.000Z')) // 19h
+      expect(day2('01:30')).toBe(at('2026-09-05T01:30:00.000Z')) // 22.5h
+    })
+
+    it('a typed first cue is the day\'s start: its end typed earlier on the clock lands the next morning', () => {
+      const ts = plan([cue('1', '21:00', 0, 30), cue('2', '09:00', 3)], null, [eod('m1', '02:00', '2'), eod('m2', '05:00', null)])
+      expect(ts[1].planned.start).toBe(at('2026-09-04T09:00:00.000Z'))
+      expect(ts[1].segmentEnd).toBe(at('2026-09-05T05:00:00.000Z'))
+    })
+
+    it('the target closes the last day the same way: typed at the day\'s start, it is a day away', () => {
+      const ts = plan([cue('1', '21:00', 0, 30), cue('2', null, 0, 35)], { time: tod('01:30') }, [eod('m1', '01:30', '2')])
+      expect(ts[1].segmentEnd).toBe(at('2026-09-05T01:30:00.000Z'))
+    })
+
     it('a typed marker absorbs the overrun above it: the next day still opens at the day end', () => {
       const ts = plan([cue('1', '01:00', 1), cue('2', null, 0, 30)], null, [eod('m1', '01:30', '2')])
       expect(ts[0].planned.finish).toBe(at('2026-09-03T02:00:00.000Z'))
