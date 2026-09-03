@@ -901,9 +901,10 @@ describe('createTimestamps', () => {
       expect(ts[2].planned.start).toBe(at('2026-09-04T21:45:00.000Z'))
     })
 
-    it('an untyped marker keeps the chain: a soft cue below it starts at the previous finish', () => {
+    it('an untyped marker is a wall too: a soft cue below it has no start, and its own end is the last finish above', () => {
       const ts = plan([cue('1', '21:00', 0, 30), cue('2', null, 0, 30)], null, [eod('m1', null, '2')])
-      expect(ts[1].planned.start).toBe(at('2026-09-03T21:30:00.000Z'))
+      expect(ts[0].segmentEnd).toBeNull()
+      expect(ts[1].planned.start).toBeNull()
     })
 
     it('a typed marker is a wall: a soft cue below it has no start until its day names one', () => {
@@ -996,10 +997,10 @@ describe('createTimestamps', () => {
         markers,
       )
       expect(ts.map(t => t.segmentIndex)).toEqual([0, 0, 1, 2])
-      // Questions chains off Keynote under the untyped marker and ends 22:35;
-      // its day ends 1:30 the next morning, 2h55m later.
-      expect(ts[2].planned.finish).toBe(at('2026-09-03T22:35:00.000Z'))
-      expect(ts[2].segmentEnd! - ts[2].planned.finish!).toBe(min(175))
+      // Day 2 has no start of its own. Its end typed 1:30 is the first one
+      // after Keynote's finish, and Questions fills back from it.
+      expect(ts[2].segmentEnd).toBe(at('2026-09-04T01:30:00.000Z'))
+      expect(ts[2].planned.start).toBe(at('2026-09-04T00:55:00.000Z'))
       // Day 3 has no start of its own. The show end typed 23:30 is the first
       // one after day 2's end, and Retro fills back from it.
       expect(ts[3].segmentEnd).toBe(at('2026-09-04T23:30:00.000Z'))
@@ -1413,9 +1414,10 @@ describe('createTimestamps', () => {
       expect(ts.map(t => t.segmentIndex)).toEqual([0, 0, 1])
       expect(ts[0].segmentEnd).toBeNull()
       expect(ts[2].segmentEnd).toBe(targetEnd)
-      // The wall carries through: the whole plan still chains back off the target.
+      // Nothing crosses the marker: the last day fills back off the target, the day above it has no times.
       expect(ts[2].planned.finish).toBe(targetEnd)
-      expect(ts[0].planned.start).toBe(targetEnd - min(30))
+      expect(ts[0].planned.start).toBeNull()
+      expect(ts[1].planned.finish).toBeNull()
     })
 
     it('drops an anchor naming no cue in this rundown', () => {

@@ -142,13 +142,12 @@ const TIMESTAMP_STATE = {
  *   segment has a start, typed times look from its entry: room date midnight
  *   for the first segment (today's midnight in a dateless room), then the
  *   previous marker's instant, or the previous finish under an untyped
- *   marker. A typed day end says nothing about when the next day starts: it
- *   is a wall, and the segment below anchors itself the way a room does. A
- *   typed first cue times forward, a typed end (its own marker, or the
- *   target) times backward, a typed middle cue both ways; with nothing typed
- *   every row stays null and the marker below shows no time. An untyped
- *   marker is a label, not a wall: the chain runs through it from the
- *   previous finish, as it always has.
+ *   marker. A day end says nothing about when the next day starts: every
+ *   marker is a wall, typed or not, and the segment below anchors itself the
+ *   way a room does. A typed first cue times forward, a typed end (its own
+ *   marker, or the target) times backward, a typed middle cue both ways;
+ *   with nothing typed every row stays null and the marker below shows no
+ *   time.
  *   Anchoring on the segment's *start* and not on the previous row is
  *   deliberate: a cue planned past the day's end shows as an overlap instead of
  *   silently rolling onto the next day. Resolution is therefore order-
@@ -170,8 +169,8 @@ const TIMESTAMP_STATE = {
  *   cue below starts from its own plan instead of chaining off the overrun
  *   above (the long break absorbs it, which is the whole point of declaring a
  *   day). Markers with no `time` declare the boundary without
- *   supplying an end: they still cut the segment, but the segment has no
- *   goalpost to fill backward from, so the wall carries through.
+ *   supplying an end: the segment above has no goalpost to fill backward
+ *   from, and nothing below reaches it either.
  */
 export function createTimestamps (
   timers: TimerInput[],
@@ -232,14 +231,13 @@ export function createTimestamps (
   // above). The first resolved start becomes the anchor for every typed time
   // left in the segment, the closing marker included.
   let entry: number = roomMidnight
-  let entryIsWall = false
   for (const [s, segment] of segments.entries()) {
     let segmentStart: number | null = null
 
     for (let i = segment.firstRow; i >= 0 && i <= segment.lastRow; i++) { // -1/-1 is an empty segment
       const timer = timers[i]!
-      // A typed day end is a wall: the cue below it has nothing to chain off.
-      const prev: Timestamp | undefined = i === segment.firstRow && entryIsWall ? undefined : out[i - 1]
+      // A marker is a wall: the cue below it has nothing to chain off.
+      const prev: Timestamp | undefined = i === segment.firstRow ? undefined : out[i - 1]
       const mem = memory.timers?.[String(timer._id)] ?? null
 
       let state: TimestampState
@@ -306,7 +304,6 @@ export function createTimestamps (
     if (closing) {
       segment.end = closing.time ? resolveAnchoredTime(closing.time, anchor, timezone, { after: true }) : null
       entry = segment.end ?? out[segment.lastRow]?.planned.finish ?? entry
-      entryIsWall = segment.end != null
     } else {
       segment.end = resolveTargetEnd(target, anchor, timezone)
     }
@@ -314,10 +311,11 @@ export function createTimestamps (
 
   // Both keyed by row, both sized by the number of day breaks rather than the
   // number of cues — a rundown of 900 cues and one marker holds one entry each.
-  // The row that closes a segment back-times to that segment's own end (pass 2).
-  const wallResetAtRow = new Map<number, number>()
+  // The row that closes a segment back-times to that segment's own end, or to
+  // nothing when it has none: the walk never crosses a marker (pass 2).
+  const wallResetAtRow = new Map<number, number | null>()
   for (const { end, lastRow } of segments) {
-    if (end != null && lastRow >= 0) wallResetAtRow.set(lastRow, end)
+    if (lastRow >= 0) wallResetAtRow.set(lastRow, end)
   }
   // The row that opens one: the long break above it swallows the overrun, so
   // the row starts from its own plan (pass 3).
@@ -335,8 +333,7 @@ export function createTimestamps (
 
     // This row closes a segment: back-time to that segment's own end, not to
     // whatever the rows below are working toward.
-    const reset = wallResetAtRow.get(i)
-    if (reset != null) wall = reset
+    if (wallResetAtRow.has(i)) wall = wallResetAtRow.get(i)!
 
     // Forward already filled this row. Forward wins; row's start is the new
     // wall (an upstream hard anchor seeds its own backward run).
@@ -387,7 +384,7 @@ export function createTimestamps (
         // Hard `startTime` honors the scheduled gap; chain forward only if
         // we've already overshot the anchor. Otherwise chain from prev.
         if (dayBreakAtRow.has(i)) {
-          expectedStart = plannedStart // null under a typed wall with no start of its own
+          expectedStart = plannedStart // null when the day has no start of its own
         } else if (timer.startTime && plannedStart) {
           expectedStart = prev?.expected.finish ? Math.max(plannedStart, prev.expected.finish) : plannedStart
         } else if (prev?.expected.finish) {
