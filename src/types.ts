@@ -172,9 +172,10 @@ export interface TargetInput {
  * `null` pins it below the last cue. An anchor naming no cue in the list is
  * dropped.
  *
- * `END_OF_DAY` is a full break: it seeds the reverse walk (rows above it back-
- * time to it, not to the show target) *and* stops drift crossing it, so the
- * first cue below starts from its own plan. Sleep absorbs the overrun.
+ * `END_OF_DAY` is a wall, with or without a `time`. Nothing crosses it in
+ * either direction: rows above back-time to it (not to the show target), rows
+ * below never chain off it, and drift stops at it. The segment below anchors
+ * itself like a rundown of its own, or has no times at all until one is typed.
  */
 export interface MarkerInput {
   _id: string

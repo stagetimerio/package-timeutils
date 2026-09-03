@@ -142,12 +142,8 @@ const TIMESTAMP_STATE = {
  *   segment has a start, typed times look from its entry: room date midnight
  *   for the first segment (today's midnight in a dateless room), then the
  *   previous marker's instant, or the previous finish under an untyped
- *   marker. A day end says nothing about when the next day starts: every
- *   marker is a wall, typed or not, and the segment below anchors itself the
- *   way a room does. A typed first cue times forward, a typed end (its own
- *   marker, or the target) times backward, a typed middle cue both ways;
- *   with nothing typed every row stays null and the marker below shows no
- *   time.
+ *   marker. The entry is only where a typed time is looked for; it is never
+ *   a start in itself.
  *   Anchoring on the segment's *start* and not on the previous row is
  *   deliberate: a cue planned past the day's end shows as an overlap instead of
  *   silently rolling onto the next day. Resolution is therefore order-
@@ -165,12 +161,18 @@ const TIMESTAMP_STATE = {
  *   (`beforeTimerId`) and closes everything above it. Its resolved instant is
  *   that segment's end — the reverse walk seeds from it exactly as the show
  *   target seeds the last segment, so rows back-time to the end they are
- *   actually working toward. A marker also stops drift crossing it: the first
- *   cue below starts from its own plan instead of chaining off the overrun
- *   above (the long break absorbs it, which is the whole point of declaring a
- *   day). Markers with no `time` declare the boundary without
- *   supplying an end: the segment above has no goalpost to fill backward
- *   from, and nothing below reaches it either.
+ *   actually working toward. Markers with no `time` declare the boundary
+ *   without supplying an end: the segment above has no goalpost to fill
+ *   backward from.
+ * - **Every marker is a wall, typed or not.** A day end says nothing about
+ *   when the next day starts, so nothing crosses a marker in either
+ *   direction: no forward chain, no reverse fill, no `expected` projection.
+ *   Each segment anchors itself the way a whole rundown does — a typed first
+ *   cue times forward, a typed end (its own marker, or the target) times
+ *   backward, a typed middle cue both ways — and with nothing typed every
+ *   row in it stays null and the marker closing it has no end. The overrun
+ *   above a marker is the night's to absorb: the first cue below starts from
+ *   its own plan.
  */
 export function createTimestamps (
   timers: TimerInput[],
