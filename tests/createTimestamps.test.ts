@@ -848,6 +848,21 @@ describe('createTimestamps', () => {
     const plan = (cues: TimerInput[], target: { time: Date } | null = null, markers: MarkerInput[] = []) =>
       createTimestamps(cues, makeTimeset({ timerId: null }), 'UTC', now, roomDate, {}, target, markers)
 
+    it('a frozen marker end stands in for a cleared time, and the day above back-times to it', () => {
+      const frozen = at('2026-09-03T17:00:00.000Z')
+      const { timestamps: ts, markers } = createAll([cue('1', null, 1), cue('2', null, 1), cue('3', '09:00', 1)], makeTimeset({ timerId: null }), 'UTC', now, roomDate, {}, null, [{ ...eod('m1', null, '3'), frozen }])
+      expect(markers[0].planned.end).toBe(frozen)
+      expect(markers[0].fixedEnd).toBe(true)
+      expect(ts[1].planned.finish).toBe(frozen)
+      expect(ts[0].planned.start).toBe(frozen - 2 * 60 * 60 * 1000)
+    })
+
+    it('a typed marker time wins over its frozen end', () => {
+      const frozen = at('2026-09-03T17:00:00.000Z')
+      const { markers } = createAll([cue('1', '10:00', 1), cue('2', '09:00', 1)], makeTimeset({ timerId: null }), 'UTC', now, roomDate, {}, null, [{ ...eod('m1', '18:00', '2'), frozen }])
+      expect(markers[0].planned.end).toBe(at('2026-09-03T18:00:00.000Z'))
+    })
+
     it('segment 1 anchors on room date midnight: a first cue typed 00:30 runs on the room date', () => {
       const ts = plan([cue('1', '00:30', 1)])
       expect(ts[0].planned.start).toBe(at('2026-09-03T00:30:00.000Z'))

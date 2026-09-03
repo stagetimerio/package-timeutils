@@ -177,11 +177,16 @@ export interface TargetInput {
  * (not to the show target), rows below never chain off it, drift stops at it.
  * Each little room times itself the way a whole room does, and one with
  * nothing typed has no times at all until someone types one.
+ *
+ * `frozen` is the segment's derived end captured when the segment kicked off,
+ * already an epoch-ms instant, the same thing `TargetInput.frozen` is for the
+ * last segment. `time` wins when both are set.
  */
 export interface MarkerInput {
   _id: string
   type: MarkerType
   time?: Date | null
+  frozen?: number | null
   beforeTimerId?: string | null
 }
 
@@ -329,16 +334,16 @@ export interface Timestamp {
  */
 export interface BoundaryTimestamp {
   /**
-   * The end the segment measures against: the typed time (or the target's
-   * kickoff-frozen end) when there is one, else where the plan lands the last
-   * cue. Null only when nothing in the segment resolves.
+   * The end the segment measures against: the typed time, else the boundary's
+   * kickoff-frozen end, else where the plan lands the last cue. Null only when
+   * nothing in the segment resolves.
    */
   planned: { end: number | null }
 
   /** Where the segment actually lands: the last cue's `expected.finish`. Mirrors `planned` until known better. */
   expected: { end: number | null }
 
-  /** True when `planned.end` is a commitment — typed, or the target's frozen end — rather than the plan's own landing. */
+  /** True when `planned.end` is a commitment — typed or kickoff-frozen — rather than the plan's own landing. */
   fixedEnd: boolean
 
   /** `planned.end` minus where the plan lands the last cue: slack (+) or overrun (−) against a fixed end. Null unless fixed. */

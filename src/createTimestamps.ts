@@ -161,9 +161,10 @@ const TIMESTAMP_STATE = {
  *   (`beforeTimerId`) and closes everything above it. Its resolved instant is
  *   that segment's end — the reverse walk seeds from it exactly as the show
  *   target seeds the last segment, so rows back-time to the end they are
- *   actually working toward. Markers with no `time` declare the boundary
- *   without supplying an end: the segment above has no goalpost to fill
- *   backward from.
+ *   actually working toward. A marker's `frozen` end stands in for a missing
+ *   `time`, as `target.frozen` does for the target. With neither, the marker
+ *   declares the boundary without supplying an end: the segment above has no
+ *   goalpost to fill backward from.
  * - **Every segment is a little room.** A marker is a wall, typed or not:
  *   a day end says nothing about when the next day starts, so nothing
  *   crosses it in either direction — no forward chain, no reverse fill, no
@@ -304,7 +305,7 @@ export function createTimestamps (
     const anchor: number = segmentStart ?? entry
     const closing = boundaries[s]
     if (closing) {
-      segment.end = closing.time ? resolveAnchoredTime(closing.time, anchor, timezone, { after: true }) : null
+      segment.end = closing.time ? resolveAnchoredTime(closing.time, anchor, timezone, { after: true }) : closing.frozen ?? null
       entry = segment.end ?? out[segment.lastRow]?.planned.finish ?? entry
     } else {
       segment.end = resolveTargetEnd(target, anchor, timezone)

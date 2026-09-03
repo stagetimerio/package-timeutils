@@ -12,11 +12,11 @@ describe('resolveMarkerBoundaries', () => {
   })
 
   it('anchors to the index of the cue it sits above', () => {
-    expect(resolveMarkerBoundaries([marker()], timers)).toEqual([{ markerId: 'm1', index: 1, time: null }])
+    expect(resolveMarkerBoundaries([marker()], timers)).toEqual([{ markerId: 'm1', index: 1, time: null, frozen: null }])
   })
 
   it('pins a null anchor past the last cue', () => {
-    expect(resolveMarkerBoundaries([marker({ beforeTimerId: null })], timers)).toEqual([{ markerId: 'm1', index: 3, time: null }])
+    expect(resolveMarkerBoundaries([marker({ beforeTimerId: null })], timers)).toEqual([{ markerId: 'm1', index: 3, time: null, frozen: null }])
   })
 
   it('drops an anchor naming no cue in this rundown', () => {

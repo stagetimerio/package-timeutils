@@ -6,6 +6,8 @@ export interface Boundary {
   index: number
   /** The typed end, still a time-of-day. Resolved by the forward pass, in list order. */
   time: Date | null
+  /** The kickoff-frozen end, an instant already. Stands in when `time` is null. */
+  frozen: number | null
 }
 
 /**
@@ -32,7 +34,7 @@ export function resolveMarkerBoundaries (
       : indexById.get(String(marker.beforeTimerId))
     if (index === undefined || taken.has(index)) continue
     taken.add(index)
-    boundaries.push({ markerId: marker._id, index, time: marker.time ?? null })
+    boundaries.push({ markerId: marker._id, index, time: marker.time ?? null, frozen: marker.frozen ?? null })
   }
 
   return boundaries.sort((a, b) => a.index - b.index)
