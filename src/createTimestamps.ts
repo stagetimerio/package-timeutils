@@ -142,10 +142,13 @@ const TIMESTAMP_STATE = {
  *   segment has a start, typed times look from its entry: room date midnight
  *   for the first segment (today's midnight in a dateless room), then the
  *   previous marker's instant, or the previous finish under an untyped
- *   marker. A soft first cue starts at that entry too:
- *   a day opens where the last one was declared to end, never before it, and
- *   an overrun above the marker is the night's to absorb. Under an untyped
- *   marker the entry is the previous finish, so the chain simply continues.
+ *   marker. A typed day end says nothing about when the next day starts: it
+ *   is a wall, and the segment below anchors itself the way a room does. A
+ *   typed first cue times forward, a typed end (its own marker, or the
+ *   target) times backward, a typed middle cue both ways; with nothing typed
+ *   every row stays null and the marker below shows no time. An untyped
+ *   marker is a label, not a wall: the chain runs through it from the
+ *   previous finish, as it always has.
  *   Anchoring on the segment's *start* and not on the previous row is
  *   deliberate: a cue planned past the day's end shows as an overlap instead of
  *   silently rolling onto the next day. Resolution is therefore order-
@@ -225,18 +228,18 @@ export function createTimestamps (
   // `planned` and the fields that depend only on (timer, timeset): state,
   // memory, explicit flags. `expected`, drift, and gap are filled in pass 3.
   //
-  // `entry` is where a segment's first typed time is looked for, and where a
-  // soft first cue starts when the day above declared its end (see the rule
+  // `entry` is where a segment's first typed time is looked for (see the rule
   // above). The first resolved start becomes the anchor for every typed time
   // left in the segment, the closing marker included.
   let entry: number = roomMidnight
-  let entryIsDayEnd = false
+  let entryIsWall = false
   for (const [s, segment] of segments.entries()) {
     let segmentStart: number | null = null
 
     for (let i = segment.firstRow; i >= 0 && i <= segment.lastRow; i++) { // -1/-1 is an empty segment
       const timer = timers[i]!
-      const prev = out[i - 1]
+      // A typed day end is a wall: the cue below it has nothing to chain off.
+      const prev: Timestamp | undefined = i === segment.firstRow && entryIsWall ? undefined : out[i - 1]
       const mem = memory.timers?.[String(timer._id)] ?? null
 
       let state: TimestampState
@@ -251,7 +254,6 @@ export function createTimestamps (
       // The first resolved start becomes the segment's, so a first cue's own
       // finish already counts from its start.
       if (timer.startTime) plannedStart = resolveAnchoredTime(timer.startTime, segmentStart ?? entry, timezone)
-      else if (segmentStart == null && entryIsDayEnd) plannedStart = entry
       else if (prev?.planned.finish) plannedStart = prev.planned.finish
       segmentStart ??= plannedStart
 
@@ -299,12 +301,12 @@ export function createTimestamps (
       segmentStart ??= plannedStart
     }
 
-    const anchor = segmentStart ?? entry
+    const anchor: number = segmentStart ?? entry
     const closing = boundaries[s]
     if (closing) {
       segment.end = closing.time ? resolveAnchoredTime(closing.time, anchor, timezone, { after: true }) : null
       entry = segment.end ?? out[segment.lastRow]?.planned.finish ?? entry
-      entryIsDayEnd = segment.end != null
+      entryIsWall = segment.end != null
     } else {
       segment.end = resolveTargetEnd(target, anchor, timezone)
     }
@@ -384,8 +386,8 @@ export function createTimestamps (
       case TIMESTAMP_STATE.FUTURE:
         // Hard `startTime` honors the scheduled gap; chain forward only if
         // we've already overshot the anchor. Otherwise chain from prev.
-        if (dayBreakAtRow.has(i) && plannedStart) {
-          expectedStart = plannedStart
+        if (dayBreakAtRow.has(i)) {
+          expectedStart = plannedStart // null under a typed wall with no start of its own
         } else if (timer.startTime && plannedStart) {
           expectedStart = prev?.expected.finish ? Math.max(plannedStart, prev.expected.finish) : plannedStart
         } else if (prev?.expected.finish) {
