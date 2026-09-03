@@ -134,13 +134,16 @@ const TIMESTAMP_STATE = {
  *   calendar day it lands on follows from its position, never from the input.
  *   Every typed time resolves to the first occurrence of that time-of-day, in
  *   `timezone`, at or after its anchor: the start of its segment, which is the
- *   segment's first cue's resolved start (the previous finish when that cue is
- *   soft). So a cue typed earlier than the day's first cue rolls to the next
- *   day, and a closing marker can never land before the cues it closes. Until
- *   a segment has a start, typed times look from its entry: room date
- *   midnight for the first segment (today's midnight in a dateless room), then
- *   the previous marker's instant, or the previous finish under an untyped
- *   marker. Anchoring on the segment's *start* and not on the previous row is
+ *   segment's first cue's resolved start. So a cue typed earlier than the
+ *   day's first cue rolls to the next day, and a closing marker can never land
+ *   before the cues it closes. Until a segment has a start, typed times look
+ *   from its entry: room date midnight for the first segment (today's midnight
+ *   in a dateless room), then the previous marker's instant, or the previous
+ *   finish under an untyped marker. A soft first cue starts at that entry too:
+ *   a day opens where the last one was declared to end, never before it, and
+ *   an overrun above the marker is the night's to absorb. Under an untyped
+ *   marker the entry is the previous finish, so the chain simply continues.
+ *   Anchoring on the segment's *start* and not on the previous row is
  *   deliberate: a cue planned past the day's end shows as an overlap instead of
  *   silently rolling onto the next day. Resolution is therefore order-
  *   dependent — a typed start depends on the rows above it.
@@ -219,10 +222,12 @@ export function createTimestamps (
   // `planned` and the fields that depend only on (timer, timeset): state,
   // memory, explicit flags. `expected`, drift, and gap are filled in pass 3.
   //
-  // `entry` is where a segment's first typed time is looked for (see the rule
+  // `entry` is where a segment's first typed time is looked for, and where a
+  // soft first cue starts when the day above declared its end (see the rule
   // above). The first resolved start becomes the anchor for every typed time
   // left in the segment, the closing marker included.
   let entry: number = roomMidnight
+  let entryIsDayEnd = false
   for (const [s, segment] of segments.entries()) {
     let segmentStart: number | null = null
 
@@ -243,6 +248,7 @@ export function createTimestamps (
       // The first resolved start becomes the segment's, so a first cue's own
       // finish already counts from its start.
       if (timer.startTime) plannedStart = resolveAnchoredTime(timer.startTime, segmentStart ?? entry, timezone)
+      else if (segmentStart == null && entryIsDayEnd) plannedStart = entry
       else if (prev?.planned.finish) plannedStart = prev.planned.finish
       segmentStart ??= plannedStart
 
@@ -295,6 +301,7 @@ export function createTimestamps (
     if (closing) {
       segment.end = closing.time ? resolveAnchoredTime(closing.time, anchor, timezone) : null
       entry = segment.end ?? out[segment.lastRow]?.planned.finish ?? entry
+      entryIsDayEnd = segment.end != null
     } else {
       segment.end = resolveTargetEnd(target, anchor, timezone)
     }

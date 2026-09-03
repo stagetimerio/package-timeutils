@@ -901,6 +901,27 @@ describe('createTimestamps', () => {
       expect(ts[2].planned.start).toBe(at('2026-09-04T21:45:00.000Z'))
     })
 
+    it('an untyped marker keeps the chain: a soft cue below it starts at the previous finish', () => {
+      const ts = plan([cue('1', '21:00', 0, 30), cue('2', null, 0, 30)], null, [eod('m1', null, '2')])
+      expect(ts[1].planned.start).toBe(at('2026-09-03T21:30:00.000Z'))
+    })
+
+    it('a typed marker opens the next day: a soft cue below it starts at the day end, not the previous finish', () => {
+      const ts = plan([cue('1', '21:00', 0, 30), cue('2', '21:30', 0, 30), cue('3', null, 0, 35)], null, [eod('m1', '01:30', '3')])
+      expect(ts[2].planned.start).toBe(at('2026-09-04T01:30:00.000Z'))
+      expect(ts[2].planned.finish).toBe(at('2026-09-04T02:05:00.000Z'))
+      // Only the day's first cue reads the entry; the rest chain as before.
+      const ts2 = plan([cue('1', '21:00', 0, 30), cue('2', null, 0, 35), cue('3', null, 0, 10)], null, [eod('m1', '01:30', '2')])
+      expect(ts2[2].planned.start).toBe(at('2026-09-04T02:05:00.000Z'))
+    })
+
+    it('a typed marker absorbs the overrun above it: the next day still opens at the day end', () => {
+      const ts = plan([cue('1', '01:00', 1), cue('2', null, 0, 30)], null, [eod('m1', '01:30', '2')])
+      expect(ts[0].planned.finish).toBe(at('2026-09-03T02:00:00.000Z'))
+      expect(ts[0].segmentEnd).toBe(at('2026-09-03T01:30:00.000Z'))
+      expect(ts[1].planned.start).toBe(at('2026-09-03T01:30:00.000Z'))
+    })
+
     it('two markers typed 02:30 with a 01:00 hard start between them', () => {
       const markers = [eod('m1', '02:30', '2'), eod('m2', '02:30', null)]
       const ts = plan([cue('1', '20:00', 1), cue('2', '01:00', 1)], null, markers)
@@ -930,11 +951,15 @@ describe('createTimestamps', () => {
         markers,
       )
       expect(ts.map(t => t.segmentIndex)).toEqual([0, 0, 1, 2])
-      // Questions ends 22:35; its day ends 1:30 the next morning, 2h55m later.
+      // Questions chains off Keynote under the untyped marker and ends 22:35;
+      // its day ends 1:30 the next morning, 2h55m later.
       expect(ts[2].planned.finish).toBe(at('2026-09-03T22:35:00.000Z'))
       expect(ts[2].segmentEnd! - ts[2].planned.finish!).toBe(min(175))
-      // Retro ends 22:45; the show ends 23:30 the same evening, 45m later.
-      expect(ts[3].segmentEnd! - ts[3].planned.finish!).toBe(min(45))
+      // Day 3 opens where day 2 ended: Retro 1:30–1:40, and the show end
+      // typed 23:30 is the first one after that, 21h50m later.
+      expect(ts[3].planned.start).toBe(at('2026-09-04T01:30:00.000Z'))
+      expect(ts[3].segmentEnd).toBe(at('2026-09-04T23:30:00.000Z'))
+      expect(ts[3].segmentEnd! - ts[3].planned.finish!).toBe(min(21 * 60 + 50))
     })
 
     it('accepted: typed times inside a long segment resolve within 24h of its start, the rows above show as overlap', () => {
@@ -1294,8 +1319,8 @@ describe('createTimestamps', () => {
     })
 
     it('reverse walk: soft rows above a marker fill back from it, not from the target', () => {
-      // No hard anchors anywhere. t3 back-fills from the target, t1/t2 from the
-      // marker — without markers all three would chain back off the target.
+      // No hard anchors anywhere. t1/t2 back-fill from the marker; t3 opens the
+      // next day where the marker ends it, so the target is slack, not a wall.
       timeset.timerId = null
       const dayEnd = THREE_PM + min(25)
       const targetEnd = THREE_PM + min(90)
@@ -1304,7 +1329,8 @@ describe('createTimestamps', () => {
       expect(ts[1].planned.finish).toBe(dayEnd)
       expect(ts[1].planned.start).toBe(dayEnd - min(10))
       expect(ts[0].planned.finish).toBe(dayEnd - min(10))
-      expect(ts[2].planned.finish).toBe(targetEnd)
+      expect(ts[2].planned.start).toBe(dayEnd)
+      expect(ts[2].segmentEnd).toBe(targetEnd)
     })
 
     it('END_OF_DAY absorbs the overrun above it: the next day starts on plan', () => {
