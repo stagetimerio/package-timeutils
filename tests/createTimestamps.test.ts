@@ -10,6 +10,7 @@ const createTimestamps = (...args: Parameters<typeof createAll>) => createAll(..
 
 const THREE_PM = parseDateAsToday('2022-01-01T15:00:00.000Z').getTime()
 const min = (n: number) => n * 60_000
+const DAY = min(24 * 60)
 const at = (iso: string) => new Date(iso).getTime()
 const tod = (hhmm: string) => new Date(`2000-01-01T${hhmm}:00.000Z`) // time-of-day carrier; the date part is inert
 
@@ -951,18 +952,18 @@ describe('createTimestamps', () => {
 
     it('a day cannot end when it begins: two day ends typed the same time are 24h apart', () => {
       const markers = [eod('m1', '01:30', '2'), eod('m2', '01:30', '3')]
-      const ts = plan([cue('1', '21:00', 0, 30), cue('2', null, 0, 35), cue('3', null, 0, 10)], null, markers)
+      const ts = plan([cue('1', '21:00', 0, 30), cue('2', '01:30', 0, 35), cue('3', null, 0, 10)], null, markers)
       expect(ts[0].segmentEnd).toBe(at('2026-09-04T01:30:00.000Z'))
+      expect(ts[1].planned.start).toBe(at('2026-09-04T01:30:00.000Z'))
       expect(ts[1].segmentEnd).toBe(at('2026-09-05T01:30:00.000Z'))
-      // Day 2 fills back from its own end; day 3 has no end and no start.
-      expect(ts[1].planned.finish).toBe(at('2026-09-05T01:30:00.000Z'))
+      // Day 3 has no end and no start.
       expect(ts[2].planned.start).toBeNull()
     })
 
-    it('the next day\'s end lands within 24h of its start: later on the clock stays, earlier rolls', () => {
+    it('an untyped day\'s end lands on its own event day, wherever the day above ended', () => {
       const day2 = (end: string) => plan([cue('1', '21:00', 0, 30), cue('2', null, 0, 35)], null, [eod('m1', '03:00', '2'), eod('m2', end, null)])[1].segmentEnd
-      expect(day2('22:00')).toBe(at('2026-09-04T22:00:00.000Z')) // 19h
-      expect(day2('01:30')).toBe(at('2026-09-05T01:30:00.000Z')) // 22.5h
+      expect(day2('22:00')).toBe(at('2026-09-04T22:00:00.000Z'))
+      expect(day2('01:30')).toBe(at('2026-09-04T01:30:00.000Z'))
     })
 
     it('a typed first cue is the day\'s start: its end typed earlier on the clock lands the next morning', () => {
@@ -972,7 +973,7 @@ describe('createTimestamps', () => {
     })
 
     it('the target closes the last day the same way: typed at the day\'s start, it is a day away', () => {
-      const ts = plan([cue('1', '21:00', 0, 30), cue('2', null, 0, 35)], { time: tod('01:30') }, [eod('m1', '01:30', '2')])
+      const ts = plan([cue('1', '21:00', 0, 30), cue('2', '01:30', 0, 35)], { time: tod('01:30') }, [eod('m1', '01:30', '2')])
       expect(ts[1].segmentEnd).toBe(at('2026-09-05T01:30:00.000Z'))
     })
 
@@ -980,15 +981,38 @@ describe('createTimestamps', () => {
       const ts = plan([cue('1', '01:00', 1), cue('2', '09:00', 0, 30)], null, [eod('m1', '01:30', '2')])
       expect(ts[0].planned.finish).toBe(at('2026-09-03T02:00:00.000Z'))
       expect(ts[0].segmentEnd).toBe(at('2026-09-03T01:30:00.000Z'))
-      expect(ts[1].planned.start).toBe(at('2026-09-03T09:00:00.000Z'))
+      expect(ts[1].planned.start).toBe(at('2026-09-04T09:00:00.000Z'))
     })
 
-    it('two markers typed 02:30 with a 01:00 hard start between them', () => {
+    it('a cue below an End of Day sits on the next event day, not the day after the marker', () => {
       const markers = [eod('m1', '02:30', '2'), eod('m2', '02:30', null)]
       const ts = plan([cue('1', '20:00', 1), cue('2', '01:00', 1)], null, markers)
       expect(ts[0].segmentEnd).toBe(at('2026-09-04T02:30:00.000Z'))
-      expect(ts[1].planned.start).toBe(at('2026-09-05T01:00:00.000Z'))
-      expect(ts[1].segmentEnd).toBe(at('2026-09-05T02:30:00.000Z'))
+      // Day 1 overran into the 4th; day 2 is still the 4th, its 01:00 cue is an overlap, not a day later.
+      expect(ts[1].planned.start).toBe(at('2026-09-04T01:00:00.000Z'))
+      expect(ts[1].segmentEnd).toBe(at('2026-09-04T02:30:00.000Z'))
+    })
+
+    it('Lukas\'s staging room: a long day 2 pushed into the 5th does not move day 3 off the 5th', () => {
+      // Day 1 typed 10:30. Untyped End of Day. Day 2 untyped, one 20h10m cue, End of Day typed 17:00. Day 3 typed 10:00.
+      const markers = [eod('m1', null, '4'), eod('m2', '17:00', '8')]
+      const ts = plan(
+        [cue('1', '10:30', 0, 30), cue('2', null, 1, 30), cue('3', null, 0, 10),
+          cue('4', null, 0, 10), cue('5', null, 0, 45), cue('6', null, 20, 10), cue('7', null, 0, 35),
+          cue('8', '10:00', 0, 10), cue('9', null, 0, 30)],
+        null,
+        markers,
+      )
+      expect(ts.map(t => t.segmentIndex)).toEqual([0, 0, 0, 1, 1, 1, 1, 2, 2])
+      expect(ts[3].segmentEnd).toBe(at('2026-09-04T17:00:00.000Z'))
+      expect(ts[6].planned.start).toBe(at('2026-09-04T16:25:00.000Z'))
+      expect(ts[3].planned.start).toBe(at('2026-09-03T19:20:00.000Z'))
+      expect(ts[7].planned.start).toBe(at('2026-09-05T10:00:00.000Z'))
+    })
+
+    it('a hard start on day 2 lands on day 2\'s date, whatever day 1 did', () => {
+      const ts = plan([cue('1', '10:30', 0, 30), cue('2', null, 20, 10), cue('3', '16:00', 0, 35)], null, [eod('m1', null, '3')])
+      expect(ts[2].planned.start).toBe(at('2026-09-04T16:00:00.000Z'))
     })
 
     it('a marker at the top of the list anchors on room date midnight, and segment 2 anchors on it', () => {
@@ -1016,10 +1040,10 @@ describe('createTimestamps', () => {
       // after Keynote's finish, and Questions fills back from it.
       expect(ts[2].segmentEnd).toBe(at('2026-09-04T01:30:00.000Z'))
       expect(ts[2].planned.start).toBe(at('2026-09-04T00:55:00.000Z'))
-      // Day 3 has no start of its own. The show end typed 23:30 is the first
-      // one after day 2's end, and Retro fills back from it.
-      expect(ts[3].segmentEnd).toBe(at('2026-09-04T23:30:00.000Z'))
-      expect(ts[3].planned.start).toBe(at('2026-09-04T23:20:00.000Z'))
+      // Day 3 has no start of its own. The show end typed 23:30 lands on day
+      // 3's own date, and Retro fills back from it.
+      expect(ts[3].segmentEnd).toBe(at('2026-09-05T23:30:00.000Z'))
+      expect(ts[3].planned.start).toBe(at('2026-09-05T23:20:00.000Z'))
       expect(ts[3].segmentEnd! - ts[3].planned.finish!).toBe(0)
     })
 
@@ -1404,7 +1428,7 @@ describe('createTimestamps', () => {
       const markers = [marker({ beforeTimerId: '2', time: new Date(THREE_PM + min(10)) })]
       const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM + min(25), null, {}, null, markers)
       expect(ts[0].expected.finish).toBe(THREE_PM + min(25))
-      expect(ts[1].planned.start).toBe(THREE_PM + min(20))
+      expect(ts[1].planned.start).toBe(THREE_PM + DAY + min(20))
       expect(ts[1].expected.start).toBe(ts[1].planned.start)
       expect(ts[1].startDrift).toBe(0)
     })
@@ -1480,10 +1504,10 @@ describe('createTimestamps', () => {
         gap: dayEnd - timestamps[0].planned.finish,
         drift: timestamps[0].planned.finish - dayEnd,
       })
-      expect(out[0].planned.end).toBe(THREE_PM + min(40))
+      expect(out[0].planned.end).toBe(THREE_PM + DAY + min(40))
       expect(out[0].expected.end).toBe(timestamps[2].planned.finish)
       expect(timestamps[0].segmentEnd).toBe(dayEnd)
-      expect(timestamps[2].segmentEnd).toBe(THREE_PM + min(40))
+      expect(timestamps[2].segmentEnd).toBe(THREE_PM + DAY + min(40))
     })
 
     it('a typed marker pre-show: gap is the plan\'s slack, drift its mirror', () => {

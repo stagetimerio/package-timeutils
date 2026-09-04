@@ -4,6 +4,8 @@ import { resolveAnchoredTime } from './timestamp-utils/resolveAnchoredTime'
 import { resolveMarkerBoundaries } from './timestamp-utils/resolveMarkerBoundaries'
 import { resolveTargetEnd } from './timestamp-utils/resolveTargetEnd'
 import { resolveSegments, type Segment } from './timestamp-utils/resolveSegments'
+import { addDays } from 'date-fns/addDays'
+import { tz } from '@date-fns/tz'
 import type {
   TimerInput,
   TimesetInput,
@@ -129,25 +131,32 @@ const TIMESTAMP_STATE = {
  * - **Drift / gap inherit nulls.** `startDrift` / `finishDrift` / `gap` are
  *   `null` when either endpoint of the subtraction is null. `gap` is `0` for
  *   the first row by convention.
+ * - **Every segment is an event day.** Segment 0 is the room date (today in
+ *   a dateless room), segment 1 the calendar day after it, segment N the
+ *   room date plus N days, in `timezone`. That is the whole calendar: an
+ *   End of Day means "the next cue is on the next event day", and nothing
+ *   else decides a segment's date — not the marker's time, not where the day
+ *   above landed. A day that overruns into the small hours, or a cue long
+ *   enough to run through the next day entirely, does not push the days
+ *   below it along; they keep their date and the overrun shows as overlap.
+ *   Each segment's *entry* is midnight of its event day: where its typed
+ *   times are looked for until the segment has a start of its own. The entry
+ *   is never a start in itself.
  * - **The rundown never runs backwards.** A typed time (`startTime`,
  *   `finishTime`, a marker's `time`, `target.time`) is a time-of-day; the
  *   calendar day it lands on follows from its position, never from the input.
  *   Every typed time resolves to the first occurrence of that time-of-day, in
- *   `timezone`, after its anchor: the start of its segment, which is the
- *   segment's first cue's resolved start. A cue may land on the start itself;
- *   a closing marker or the target lands strictly after it, since a day cannot
- *   end when it begins — two day ends typed the same time are 24 hours apart.
- *   So a cue typed earlier than the day's first cue rolls to the next day, and
- *   a closing marker can never land before the cues it closes. Until a
- *   segment has a start, typed times look from its entry: room date midnight
- *   for the first segment (today's midnight in a dateless room), then the
- *   previous marker's instant, or the previous finish under an untyped
- *   marker. The entry is only where a typed time is looked for; it is never
- *   a start in itself.
- *   Anchoring on the segment's *start* and not on the previous row is
- *   deliberate: a cue planned past the day's end shows as an overlap instead of
- *   silently rolling onto the next day. Resolution is therefore order-
- *   dependent — a typed start depends on the rows above it.
+ *   `timezone`, after its anchor: the start of its segment (the first cue's
+ *   resolved start), or the segment's entry until it has one. A cue may land
+ *   on the anchor itself; a closing marker or the target lands strictly
+ *   after it, since a day cannot end when it begins — a day 2 starting 01:30
+ *   and ending 01:30 is 24 hours long. So a cue typed earlier than the day's
+ *   first cue rolls to the next morning, and a closing marker can never land
+ *   before the cues it closes. Anchoring on the segment's *start* and not on
+ *   the previous row is deliberate: a cue planned past the day's end shows
+ *   as an overlap instead of silently rolling onto the next day. Resolution
+ *   is therefore order-dependent — a typed start depends on the rows above
+ *   it within its day, and on nothing outside it.
  * - **Strict input shapes.** Callers normalize: `startTime` / `finishTime` are
  *   `Date | null`, `kickoff` etc. are epoch ms. Library does no parsing of
  *   ISO strings or wall-clock formats.
@@ -231,10 +240,10 @@ export function createTimestamps (
   // memory, explicit flags. `expected`, drift, and gap are filled in pass 3.
   //
   // `entry` is where a segment's first typed time is looked for (see the rule
-  // above). The first resolved start becomes the anchor for every typed time
-  // left in the segment, the closing marker included.
-  let entry: number = roomMidnight
+  // above): midnight of its event day. The first resolved start becomes the
+  // anchor for every typed time left in the segment, the closing marker included.
   for (const [s, segment] of segments.entries()) {
+    const entry: number = addDays(roomMidnight, s, { in: tz(timezone ?? 'UTC') }).getTime()
     let segmentStart: number | null = null
 
     for (let i = segment.firstRow; i >= 0 && i <= segment.lastRow; i++) { // -1/-1 is an empty segment
@@ -306,7 +315,6 @@ export function createTimestamps (
     const closing = boundaries[s]
     if (closing) {
       segment.end = closing.time ? resolveAnchoredTime(closing.time, anchor, timezone, { after: true }) : closing.frozen ?? null
-      entry = segment.end ?? out[segment.lastRow]?.planned.finish ?? entry
     } else {
       segment.end = resolveTargetEnd(target, anchor, timezone)
     }
