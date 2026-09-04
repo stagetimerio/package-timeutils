@@ -2,7 +2,6 @@ import { hmsToMilliseconds } from './hmsToMilliseconds'
 import { parseCalendarDay } from './parseCalendarDay'
 import { resolveAnchoredTime } from './timestamp-utils/resolveAnchoredTime'
 import { resolveMarkerBoundaries } from './timestamp-utils/resolveMarkerBoundaries'
-import { resolveTargetEnd } from './timestamp-utils/resolveTargetEnd'
 import { resolveSegments, type Segment } from './timestamp-utils/resolveSegments'
 import { addDays } from 'date-fns/addDays'
 import { tz } from '@date-fns/tz'
@@ -312,12 +311,10 @@ export function createTimestamps (
     }
 
     const anchor: number = segmentStart ?? entry
-    const closing = boundaries[s]
-    if (closing) {
-      segment.end = closing.time ? resolveAnchoredTime(closing.time, anchor, timezone, { after: true }) : closing.frozen ?? null
-    } else {
-      segment.end = resolveTargetEnd(target, anchor, timezone)
-    }
+    const closing = boundaries[s] ?? target
+    segment.end = closing?.time
+      ? resolveAnchoredTime(closing.time, anchor, timezone, { after: true })
+      : closing?.frozen ?? null
   }
 
   // Both keyed by row, both sized by the number of day breaks rather than the
