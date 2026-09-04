@@ -960,6 +960,20 @@ describe('createTimestamps', () => {
       expect(ts[2].planned.start).toBeNull()
     })
 
+    it('scaffolding: two End of Days stacked below the last cue make an empty day, and the target moves a day on', () => {
+      const markers = [eod('m1', '17:00', null), eod('m2', '17:00', null), eod('m3', null, null)]
+      const { timestamps: ts, markers: out, target } = createAll([cue('1', '10:00', 1)], makeTimeset({ timerId: null }), 'UTC', now, roomDate, {}, { time: tod('12:00') }, markers)
+      expect(ts[0].segmentIndex).toBe(0)
+      expect(ts[0].segmentEnd).toBe(at('2026-09-03T17:00:00.000Z'))
+      // The empty day anchors on its own midnight; untyped, it has no end at all.
+      expect(out.map(m => [m.segmentIndex, m.planned.end])).toEqual([
+        [0, at('2026-09-03T17:00:00.000Z')],
+        [1, at('2026-09-04T17:00:00.000Z')],
+        [2, null],
+      ])
+      expect(target.planned.end).toBe(at('2026-09-06T12:00:00.000Z'))
+    })
+
     it('an untyped day\'s end lands on its own event day, wherever the day above ended', () => {
       const day2 = (end: string) => plan([cue('1', '21:00', 0, 30), cue('2', null, 0, 35)], null, [eod('m1', '03:00', '2'), eod('m2', end, null)])[1].segmentEnd
       expect(day2('22:00')).toBe(at('2026-09-04T22:00:00.000Z'))
@@ -1466,15 +1480,18 @@ describe('createTimestamps', () => {
       for (const t of ts) expect(t.segmentIndex).toBe(0)
     })
 
-    it('keeps only the first marker at any one boundary', () => {
+    it('two markers on one boundary cut an empty day between them: the cue below is two days on', () => {
       timers[0].startTime = new Date(THREE_PM)
       const markers = [
         marker({ _id: 'm1', time: new Date(THREE_PM + min(25)) }),
         marker({ _id: 'm2', time: new Date(THREE_PM + min(35)) }),
       ]
-      const ts = createTimestamps(timers, timeset, 'UTC', THREE_PM - min(30), null, {}, null, markers)
-      expect(ts.map(t => t.segmentIndex)).toEqual([0, 0, 1])
+      const { timestamps: ts, markers: out } = createAll(timers, timeset, 'UTC', THREE_PM - min(30), null, {}, null, markers)
+      expect(ts.map(t => t.segmentIndex)).toEqual([0, 0, 2])
       expect(ts[0].segmentEnd).toBe(THREE_PM + min(25))
+      expect(out.map(m => m.segmentIndex)).toEqual([0, 1])
+      expect(out[1].fixedEnd).toBe(true)
+      expect(out[1].gap).toBeNull()
     })
 
     it('null anchor: the marker sits below the last cue and closes the whole rundown', () => {
@@ -1545,19 +1562,17 @@ describe('createTimestamps', () => {
       expect(timestamps[0].segmentEnd).toBeNull()
     })
 
-    it('a marker naming no cue, or doubling a boundary, keeps its slot with every field null', () => {
+    it('a marker naming no cue keeps its slot with every field null', () => {
       timers[0].startTime = new Date(THREE_PM)
       const markers = [
         marker({ _id: 'm1', time: new Date(THREE_PM + min(25)) }),
-        marker({ _id: 'm2', time: new Date(THREE_PM + min(35)) }),
         marker({ _id: 'm3', beforeTimerId: 'deleted', time: new Date(THREE_PM + min(45)) }),
       ]
       const { markers: out } = createAll(timers, timeset, 'UTC', THREE_PM - min(30), null, {}, null, markers)
-      expect(out.map(m => m.markerId)).toEqual(['m1', 'm2', 'm3'])
+      expect(out.map(m => m.markerId)).toEqual(['m1', 'm3'])
       expect(out[0]).toMatchObject({ index: 2, segmentIndex: 0, planned: { end: THREE_PM + min(25) }, fixedEnd: true })
       const unplaced = { index: null, segmentIndex: null, planned: { end: null }, expected: { end: null }, fixedEnd: false, gap: null, drift: null }
-      expect(out[1]).toEqual({ markerId: 'm2', ...unplaced })
-      expect(out[2]).toEqual({ markerId: 'm3', ...unplaced })
+      expect(out[1]).toEqual({ markerId: 'm3', ...unplaced })
     })
 
     it('an empty rundown returns no rows, every marker unplaced, and an empty target', () => {

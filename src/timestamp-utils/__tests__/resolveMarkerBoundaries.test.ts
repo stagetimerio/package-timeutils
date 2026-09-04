@@ -28,9 +28,9 @@ describe('resolveMarkerBoundaries', () => {
     expect(resolveMarkerBoundaries(markers, timers).map((b) => b.index)).toEqual([1, 2])
   })
 
-  it('keeps only the first marker at a boundary — one day cannot end twice', () => {
-    const markers = [marker(), marker({ _id: 'm2' })]
-    expect(resolveMarkerBoundaries(markers, timers)).toHaveLength(1)
+  it('keeps stacked markers on one boundary in list order — an empty day between them', () => {
+    const markers = [marker({ _id: 'm2' }), marker()]
+    expect(resolveMarkerBoundaries(markers, timers).map((b) => b.markerId)).toEqual(['m2', 'm1'])
   })
 
   it('carries the typed time through unresolved — the forward pass places it', () => {
