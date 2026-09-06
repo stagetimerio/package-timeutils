@@ -1,10 +1,8 @@
 import { hmsToMilliseconds } from './hmsToMilliseconds'
-import { parseCalendarDay } from './parseCalendarDay'
 import { resolveAnchoredTime } from './timestamp-utils/resolveAnchoredTime'
 import { resolveMarkerBoundaries } from './timestamp-utils/resolveMarkerBoundaries'
 import { resolveSegments, type Segment } from './timestamp-utils/resolveSegments'
-import { addDays } from 'date-fns/addDays'
-import { tz } from '@date-fns/tz'
+import { resolveSegmentEntries } from './timestamp-utils/resolveSegmentEntries'
 import type {
   TimerInput,
   TimesetInput,
@@ -117,8 +115,10 @@ const TIMESTAMP_STATE = {
  *   projects every row straight from the plan. Without this, arming cue 3
  *   would treat cues 1-2 as "skipped in zero seconds" and the expected end
  *   would jump around as the pointer moves. Once the show has started,
- *   PAST rows without memory really do mean "skipped" and collapse as
- *   documented. `state` itself is not affected — only the expected chain.
+ *   PAST rows without memory really do mean "skipped": they happened when
+ *   the run passed them, so they collapse to zero duration onto the previous
+ *   row's expected finish (onto their plan when nothing precedes them in
+ *   their day). `state` itself is not affected — only the expected chain.
  * - **No active cue → the projection is the plan.** `timeset.timerId` can be
  *   null or dangle at a deleted timer. With no position to be relative to,
  *   every row is `FUTURE` and the chain re-projects from the plan, ignoring
@@ -130,9 +130,13 @@ const TIMESTAMP_STATE = {
  * - **Drift / gap inherit nulls.** `startDrift` / `finishDrift` / `gap` are
  *   `null` when either endpoint of the subtraction is null. `gap` is `0` for
  *   the first row by convention.
- * - **Every segment is an event day.** Segment 0 is the room date (today in
- *   a dateless room), segment 1 the calendar day after it, segment N the
- *   room date plus N days, in `timezone`. That is the whole calendar: an
+ * - **Every segment is an event day.** In a dated room segment N is the room
+ *   date plus N days, in `timezone`, whatever ran when: the date is planning,
+ *   and fact never overrides planning. In a dateless room every day that has
+ *   run is dated by when it ran — its first recorded start in list order —
+ *   and a day that hasn't counts from the nearest day that has, the one
+ *   above it first; with nothing run, segment 0 is today. Derived every
+ *   pass, never stored: reset restores today. That is the whole calendar: an
  *   End of Day means "the next cue is on the next event day", and nothing
  *   else decides a segment's date — not the marker's time, not where the day
  *   above landed. A day that overruns into the small hours, or a cue long
@@ -197,8 +201,6 @@ export function createTimestamps (
     return { timestamps: [], markers: markers.map((marker) => unplacedMarker(marker)), target: emptyBoundary() }
   }
 
-  // 00:00 local time in `timezone` on the room's date (or today if none).
-  const roomMidnight: number = parseCalendarDay(roomDate, { timezone, now: new Date(now) }).getTime()
   const kickoffMs: number | null = timeset.kickoff
   const activeIdx: number = timeset.timerId
     ? timers.findIndex(t => String(t._id) === String(timeset.timerId))
@@ -229,7 +231,15 @@ export function createTimestamps (
   // closes the last piece. With no markers this is one segment and every rule
   // below reduces to what it was before them. Ends are filled by pass 1.
   const boundaries = resolveMarkerBoundaries(markers, timers)
-  const { segments } = resolveSegments(boundaries, timers.length)
+  const { segments, segmentIndexByRow } = resolveSegments(boundaries, timers.length)
+
+  // Every day that has run is dated by when it ran (see the rule above).
+  const runStarts: (number | null)[] = segments.map(() => null)
+  for (const [i, timer] of timers.entries()) {
+    const s = segmentIndexByRow[i]!
+    runStarts[s] ??= memory.timers?.[String(timer._id)]?.start ?? null
+  }
+  const entries: number[] = resolveSegmentEntries(runStarts, roomDate, timezone, now)
 
   const out: Timestamp[] = []
 
@@ -242,7 +252,7 @@ export function createTimestamps (
   // above): midnight of its event day. The first resolved start becomes the
   // anchor for every typed time left in the segment, the closing marker included.
   for (const [s, segment] of segments.entries()) {
-    const entry: number = addDays(roomMidnight, s, { in: tz(timezone ?? 'UTC') }).getTime()
+    const entry: number = entries[s]!
     let segmentStart: number | null = null
 
     for (let i = segment.firstRow; i >= 0 && i <= segment.lastRow; i++) { // -1/-1 is an empty segment
@@ -381,6 +391,7 @@ export function createTimestamps (
     switch (chainState) {
       case TIMESTAMP_STATE.PAST:
         if (mem?.start) expectedStart = mem.start
+        else if (!dayBreakAtRow.has(i) && prev?.expected.finish) expectedStart = prev.expected.finish // skipped: happened when the run passed it
         break
       case TIMESTAMP_STATE.ACTIVE:
         // Prefer memory.start over kickoff: kickoff drifts with pause/resume/

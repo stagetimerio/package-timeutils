@@ -29,5 +29,6 @@ export * from './parseDate'
 export * from './parseDateAsToday'
 export * from './resolveTimerDatetime'
 export * from './timestamp-utils/resolveMarkerBoundaries'
+export * from './timestamp-utils/resolveSegmentEntries'
 
 export * from './types'

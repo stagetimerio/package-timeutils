@@ -1,0 +1,41 @@
+{
+  "capturedAt": "2026-09-06T06:18:07.586Z",
+  "note": "Three-day workshop in a dateless Europe/Berlin room. Days 1 and 2 were run on 2026-09-05, Day 3 Welcome went live 2026-09-06 07:51 CEST with Questions skipped. Source: .claude/timing-system-v2/timestamp-issues.md (T1, T2).",
+  "timers": [
+    { "_id": "69eb3194816a085265541498", "name": "Intro", "type": "DURATION", "trigger": "MANUAL", "hours": 0, "minutes": 30, "seconds": 0, "startTime": "2026-09-04T08:30:00.000Z", "finishTime": null },
+    { "_id": "69eb3203816a0852655414d2", "name": "Keynote", "type": "DURATION", "trigger": "MANUAL", "hours": 1, "minutes": 30, "seconds": 0, "startTime": null, "finishTime": null },
+    { "_id": "6a9969fa586e2f5c20f84d33", "name": "Crew Feature", "type": "DURATION", "trigger": "MANUAL", "hours": 0, "minutes": 10, "seconds": 0, "startTime": null, "finishTime": null },
+    { "_id": "6a9929c25197837fa16ca66b", "name": "Day 2 Welcome", "type": "DURATION", "trigger": "MANUAL", "hours": 0, "minutes": 10, "seconds": 0, "startTime": null, "finishTime": null },
+    { "_id": "6a996a1e586e2f5c20f84d38", "name": "Workshop", "type": "DURATION", "trigger": "MANUAL", "hours": 0, "minutes": 45, "seconds": 0, "startTime": null, "finishTime": null },
+    { "_id": "69eb3205816a0852655414d4", "name": "Questions", "type": "DURATION", "trigger": "MANUAL", "hours": 0, "minutes": 35, "seconds": 0, "startTime": null, "finishTime": null },
+    { "_id": "6a996a2f586e2f5c20f84d3c", "name": "Day 3 Welcome", "type": "DURATION", "trigger": "MANUAL", "hours": 0, "minutes": 10, "seconds": 0, "startTime": "2026-09-04T08:00:00.000Z", "finishTime": null },
+    { "_id": "6a996a39586e2f5c20f84d3f", "name": "Prep", "type": "DURATION", "trigger": "MANUAL", "hours": 0, "minutes": 30, "seconds": 0, "startTime": null, "finishTime": null },
+    { "_id": "69ec6f985df810c4c494e3e1", "name": "Retro", "type": "DURATION", "trigger": "MANUAL", "hours": 1, "minutes": 10, "seconds": 0, "startTime": null, "finishTime": null },
+    { "_id": "6a9931fe5fc5c460a2215df2", "name": "Goodbye", "type": "DURATION", "trigger": "MANUAL", "hours": 0, "minutes": 20, "seconds": 0, "startTime": null, "finishTime": null }
+  ],
+  "timeset": {
+    "timerId": "6a996a2f586e2f5c20f84d3c",
+    "running": true,
+    "deadline": 1788674545058,
+    "kickoff": 1788673945058,
+    "lastStop": 1788673945058
+  },
+  "timezone": "Europe/Berlin",
+  "now": 1788675487584,
+  "roomDate": null,
+  "memory": {
+    "timers": {
+      "69eb3194816a085265541498": { "start": 1788597814911, "finish": 1788599267806, "elapsed": 1452895 },
+      "69eb3203816a0852655414d2": { "start": 1788599267806, "finish": 1788619998569, "elapsed": 20730763 },
+      "6a9969fa586e2f5c20f84d33": { "start": 1788619998569, "finish": 1788620022355, "elapsed": 23786 },
+      "6a9929c25197837fa16ca66b": { "start": 1788620022355, "finish": 1788626092679, "elapsed": 6110749 },
+      "6a996a1e586e2f5c20f84d38": { "start": 1788626092679, "finish": 1788673945058, "elapsed": 20059 },
+      "6a996a2f586e2f5c20f84d3c": { "start": 1788673880147, "finish": null, "elapsed": 600000 }
+    }
+  },
+  "target": { "_id": "target", "time": null, "frozen": 1788862200000 },
+  "markers": [
+    { "_id": "06beef42-d791-4058-b5da-c0835e0538a4", "type": "END_OF_DAY", "time": "2026-09-05T11:10:00.000Z", "beforeTimerId": "6a9929c25197837fa16ca66b", "frozen": 1788604800000 },
+    { "_id": "aa15c731-bd1b-4c21-8ce5-2ff71f0f6d80", "type": "END_OF_DAY", "time": null, "beforeTimerId": "6a996a2f586e2f5c20f84d3c", "frozen": 1788625422355 }
+  ]
+}

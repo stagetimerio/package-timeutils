@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createTimestamps as createAll } from '../src/createTimestamps'
-import type { TimerInput, TimesetInput, MemoryInput, MarkerInput } from '../src/types'
+import type { TimerInput, TimesetInput, MemoryInput, MarkerInput, TargetInput, Timestamp } from '../src/types'
 import { parseDateAsToday } from '../src/parseDateAsToday'
 import timestampsFixture1 from './fixtures/timestamps-1-in.json' with { type: 'json' }
 import timestampsFixture2 from './fixtures/timestamps-2-in.json' with { type: 'json' }
+import timestampsDump3 from './fixtures/timestamps-3-dump.json' with { type: 'json' }
 
 // Nearly every case here reads the timer rows only; the marker list has its own block.
 const createTimestamps = (...args: Parameters<typeof createAll>) => createAll(...args).timestamps
@@ -422,7 +423,7 @@ describe('createTimestamps', () => {
       expect(ts[0].startDrift).toBe(min(2))
     })
 
-    it('skipped PAST (positionally past, no memory) chains from prev, drift = 0', () => {
+    it('skipped PAST (positionally past, no memory) collapses onto the previous row', () => {
       // Active is timer 3, timer 1 and 2 have no memory entries (skipped).
       // State is positional → t1 and t2 are PAST; null memory flags them as unrun.
       timers[0].startTime = new Date(THREE_PM)
@@ -439,9 +440,33 @@ describe('createTimestamps', () => {
       expect(ts[0].memory).toBe(null)
       expect(ts[1].state).toBe('PAST')
       expect(ts[1].memory).toBe(null)
+      // Nothing ran before cue 1: it sits at its plan. Cue 2 happened when the run passed it, on cue 1's collapsed finish.
       expect(ts[0].startDrift).toBe(0)
-      expect(ts[1].startDrift).toBe(0)
+      expect(ts[0].expected.finish).toBe(ts[0].expected.start)
+      expect(ts[1].expected.start).toBe(ts[0].expected.finish)
+      expect(ts[1].expected.finish).toBe(ts[1].expected.start)
       expect(ts[2].state).toBe('ACTIVE')
+    })
+
+    it('a skipped row after a run row collapses onto that row\'s recorded finish', () => {
+      // A ran 3:00–3:12 (over), B was skipped, C went live at 3:12.
+      timers[0].startTime = new Date(THREE_PM)
+      timeset.timerId = '3'
+      timeset.running = true
+      timeset.kickoff = THREE_PM + min(12)
+      timeset.lastStop = THREE_PM + min(12)
+      const memory: MemoryInput = {
+        timers: {
+          '1': { start: THREE_PM, finish: THREE_PM + min(12), elapsed: min(12) },
+          '3': { start: THREE_PM + min(12), finish: null, elapsed: 0 },
+        },
+      }
+      const ts = createTimestamps(timers, timeset, undefined, THREE_PM + min(13), null, memory)
+      expect(ts[1].expected.start).toBe(THREE_PM + min(12))
+      expect(ts[1].expected.finish).toBe(THREE_PM + min(12))
+      expect(ts[1].startDrift).toBe(min(2))
+      expect(ts[1].liveGap).toBe(0)
+      expect(ts[2].expected.start).toBe(THREE_PM + min(12))
     })
 
     it('FUTURE with stale memory (jumped back) ignores memory, projects normally', () => {
@@ -1665,6 +1690,121 @@ describe('createTimestamps', () => {
       expect(target.planned.end).toBe(THREE_PM + min(50))
       expect(target.gap).toBe(THREE_PM + min(50) - timestamps[2].planned.finish)
       expect(timestamps[2].segmentEnd).toBe(THREE_PM + min(50))
+    })
+  })
+
+  // --- Event days of a dateless room ---------------------------------------
+  describe('dateless room — every day that has run is dated by when it ran', () => {
+    it('a show that ran past midnight keeps yesterday as its day', () => {
+      const yesterday22 = at('2026-03-09T22:00:00Z')
+      const now = at('2026-03-10T00:30:00Z')
+      timers[0].startTime = tod('22:00')
+      timeset.timerId = '3'
+      timeset.running = true
+      timeset.kickoff = now - min(5)
+      timeset.lastStop = now - min(5)
+      const memory: MemoryInput = {
+        timers: {
+          '1': { start: yesterday22, finish: yesterday22 + min(70), elapsed: min(70) },
+          '2': { start: yesterday22 + min(70), finish: now - min(5), elapsed: min(75) },
+          '3': { start: now - min(5), finish: null, elapsed: 0 },
+        },
+      }
+      const ts = createTimestamps(timers, timeset, 'UTC', now, null, memory)
+      expect(ts[0].planned.start).toBe(yesterday22)
+      expect(ts[0].startDrift).toBe(0)
+    })
+
+    it('an unrun day counts from the nearest run day, the one above first', () => {
+      // Day 1 ran Friday, day 2 ran Monday, day 3 has not run: Tuesday.
+      const dayBreak = (id: string): MarkerInput => ({ _id: `before-${id}`, type: 'END_OF_DAY', beforeTimerId: id })
+      timers[0].startTime = tod('10:00')
+      timers[1].startTime = tod('10:00')
+      timers[2].startTime = tod('10:00')
+      timeset.timerId = '2'
+      timeset.running = true
+      timeset.kickoff = at('2026-03-09T09:00:00Z')
+      timeset.lastStop = timeset.kickoff
+      const memory: MemoryInput = {
+        timers: {
+          '1': { start: at('2026-03-06T09:00:00Z'), finish: at('2026-03-06T09:10:00Z'), elapsed: min(10) },
+          '2': { start: at('2026-03-09T09:00:00Z'), finish: null, elapsed: 0 },
+        },
+      }
+      const ts = createTimestamps(timers, timeset, 'UTC', at('2026-03-09T09:01:00Z'), null, memory, null, [dayBreak('2'), dayBreak('3')])
+      expect(ts[0].planned.start).toBe(at('2026-03-06T10:00:00Z'))
+      expect(ts[1].planned.start).toBe(at('2026-03-09T10:00:00Z'))
+      expect(ts[2].planned.start).toBe(at('2026-03-10T10:00:00Z'))
+    })
+
+    it('a day above the first run day counts back from it', () => {
+      // Day 1 was never run; the show started on day 2 (Mar 10) and the room is opened two days later.
+      timers[0].startTime = tod('10:00')
+      timeset.timerId = '2'
+      timeset.running = true
+      timeset.kickoff = at('2026-03-10T09:00:00Z')
+      timeset.lastStop = timeset.kickoff
+      const memory: MemoryInput = {
+        timers: { '2': { start: at('2026-03-10T09:00:00Z'), finish: null, elapsed: 0 } },
+      }
+      const markers: MarkerInput[] = [{ _id: 'm1', type: 'END_OF_DAY', beforeTimerId: '2', time: tod('12:00') }]
+      const ts = createTimestamps(timers, timeset, 'UTC', at('2026-03-12T08:00:00Z'), null, memory, null, markers)
+      expect(ts[0].planned.start).toBe(at('2026-03-09T10:00:00Z'))
+      expect(ts[0].segmentEnd).toBe(at('2026-03-09T12:00:00Z'))
+    })
+
+    it('a dated room keeps its date: fact never overrides planning', () => {
+      timers[0].startTime = tod('10:00')
+      timeset.timerId = '1'
+      timeset.running = true
+      timeset.kickoff = at('2026-03-10T09:00:00Z')
+      timeset.lastStop = timeset.kickoff
+      const memory: MemoryInput = {
+        timers: { '1': { start: at('2026-03-10T09:00:00Z'), finish: null, elapsed: 0 } },
+      }
+      const ts = createTimestamps(timers, timeset, 'UTC', at('2026-03-10T09:01:00Z'), '2026-03-11', memory)
+      expect(ts[0].planned.start).toBe(at('2026-03-11T10:00:00Z'))
+    })
+  })
+
+  // --- Live dumps ------------------------------------------------------------
+  // Captured with `dumpTimestamps()` in the controller; each case replays one
+  // wrong reading logged in stagetimer/.claude/timing-system-v2/timestamp-issues.md.
+  describe('live dump 2026-09-06 — three-day workshop, dateless Berlin room', () => {
+    const dump = timestampsDump3
+    const replay = () => createAll(
+      dump.timers.map((t) => ({ ...t, startTime: t.startTime ? new Date(t.startTime) : null, finishTime: null })) as TimerInput[],
+      dump.timeset as TimesetInput,
+      dump.timezone,
+      dump.now,
+      dump.roomDate,
+      dump.memory as MemoryInput,
+      dump.target as TargetInput,
+      dump.markers.map((m) => ({ ...m, time: m.time ? new Date(m.time) : null })) as MarkerInput[],
+    )
+    const row = (rows: Timestamp[], name: string) => rows[dump.timers.findIndex((t) => t.name === name)]!
+
+    it('T1: a skipped last cue lands the day end on the last cue that ran', () => {
+      const { timestamps, markers } = replay()
+      const workshop = row(timestamps, 'Workshop')
+      const questions = row(timestamps, 'Questions')
+      expect(questions.state).toBe('PAST')
+      expect(questions.memory).toBe(null)
+      expect(questions.expected.start).toBe(workshop.expected.finish)
+      expect(questions.expected.finish).toBe(workshop.expected.finish)
+      expect(questions.liveGap).toBe(0)
+      // End of day 2 froze at 18:23:42 CEST on the 5th; the day actually ended 07:52:25 the next morning.
+      expect(markers[1]!.expected.end).toBe(1788673945058)
+      expect(markers[1]!.drift).toBe(1788673945058 - 1788625422355)
+    })
+
+    it('T2: every day is dated by when it ran, not by the day the room is opened', () => {
+      const { timestamps, markers } = replay()
+      // Days 1 and 2 both ran on the 5th; day 3 went live on the 6th; the room was opened on the 6th.
+      expect(row(timestamps, 'Intro').planned.start).toBe(at('2026-09-05T08:30:00Z')) // 10:30 CEST
+      expect(markers[0]!.planned.end).toBe(at('2026-09-05T11:10:00Z')) // 13:10 CEST
+      expect(row(timestamps, 'Day 2 Welcome').planned.start).toBe(1788620022355) // back-timed from the frozen end
+      expect(row(timestamps, 'Day 3 Welcome').planned.start).toBe(at('2026-09-06T08:00:00Z')) // 10:00 CEST, today
     })
   })
 
