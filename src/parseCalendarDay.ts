@@ -57,13 +57,10 @@ export function parseCalendarDay (
   const month = Number(match[2])
   const date = Number(match[3])
 
-  // Build a UTC pivot guaranteed to fall inside the target local day, then let
-  // getToday snap it to 00:00 local. Starting from UTC midnight of the naive
-  // date minus the zone's offset at that moment yields local midnight expressed
-  // in UTC — safe for offsets from -12h to +14h.
-  const naive = new Date(Date.UTC(year, month - 1, date))
-  const offset = getTimezoneOffset(timezone, naive)
-  const pivot = new Date(naive.getTime() - offset)
+  // Pivot on local noon, then let getToday snap it to 00:00 local. Noon is far
+  // from any DST change, so an offset that is 1h off still lands on the day.
+  const naiveNoon = new Date(Date.UTC(year, month - 1, date, 12))
+  const pivot = new Date(naiveNoon.getTime() - getTimezoneOffset(timezone, naiveNoon))
 
   return getToday(timezone, pivot)
 }

@@ -144,6 +144,48 @@ describe('parseCalendarDay', () => {
       expect(parseCalendarDay('2026-10-26', { timezone: 'Europe/Berlin' }).toISOString())
         .to.equal('2026-10-25T23:00:00.000Z')
     })
+
+    test('Pacific/Auckland spring-forward day (2026-09-27)', () => {
+      // 00:00 Auckland is still NZST (+12); DST jumps 02:00 → 03:00.
+      expect(parseCalendarDay('2026-09-27', { timezone: 'Pacific/Auckland' }).toISOString())
+        .to.equal('2026-09-26T12:00:00.000Z')
+    })
+
+    test('Pacific/Chatham spring-forward day (2026-09-27)', () => {
+      // 00:00 Chatham is still +12:45; DST jumps 02:45 → 03:45.
+      expect(parseCalendarDay('2026-09-27', { timezone: 'Pacific/Chatham' }).toISOString())
+        .to.equal('2026-09-26T11:15:00.000Z')
+    })
+
+    test('Australia/Sydney spring-forward day (2026-10-04)', () => {
+      // 00:00 Sydney is still AEST (+10); DST jumps 02:00 → 03:00.
+      expect(parseCalendarDay('2026-10-04', { timezone: 'Australia/Sydney' }).toISOString())
+        .to.equal('2026-10-03T14:00:00.000Z')
+    })
+
+    test('Pacific/Auckland fall-back day (2027-04-04)', () => {
+      // 00:00 Auckland is still NZDT (+13); DST ends at 03:00 → 02:00.
+      expect(parseCalendarDay('2027-04-04', { timezone: 'Pacific/Auckland' }).toISOString())
+        .to.equal('2027-04-03T11:00:00.000Z')
+    })
+
+    test('America/Santiago spring-forward at midnight (2026-09-06)', () => {
+      // 00:00 does not exist; DST jumps 00:00 → 01:00 (-4 → -3).
+      expect(parseCalendarDay('2026-09-06', { timezone: 'America/Santiago' }).toISOString())
+        .to.equal('2026-09-06T04:00:00.000Z')
+    })
+
+    test('America/Havana spring-forward at midnight (2026-03-08)', () => {
+      // 00:00 does not exist; DST jumps 00:00 → 01:00 (-5 → -4).
+      expect(parseCalendarDay('2026-03-08', { timezone: 'America/Havana' }).toISOString())
+        .to.equal('2026-03-08T05:00:00.000Z')
+    })
+
+    test('Australia/Sydney fall-back day (2027-04-04)', () => {
+      // 00:00 Sydney is still AEDT (+11); DST ends at 03:00 → 02:00.
+      expect(parseCalendarDay('2027-04-04', { timezone: 'Australia/Sydney' }).toISOString())
+        .to.equal('2027-04-03T13:00:00.000Z')
+    })
   })
 
   // -----------------------------------------------------------------

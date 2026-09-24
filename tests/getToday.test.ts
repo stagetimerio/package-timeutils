@@ -86,4 +86,15 @@ describe('applyDate', () => {
     const today3 = getToday(tz, new Date('2025-03-31T17:43:50.000Z')) // Mon Mar 31 2025 19:43:50 GMT+0200 (Central European Summer Time)
     expect(today3.toISOString()).to.equal('2025-03-30T22:00:00.000Z') // Mon Mar 31 2025 00:00:00 GMT+0200 (Central European Summer Time)
   })
+
+  test('Bug: Wrong date on DST day in zones far east of UTC, 2026-09-27', () => {
+    const today1 = getToday('Pacific/Auckland', new Date('2026-09-27T06:50:42.000Z')) // Sun Sep 27 2026 19:50:42 GMT+1300 (NZDT)
+    expect(today1.toISOString()).to.equal('2026-09-26T12:00:00.000Z') // Sun Sep 27 2026 00:00:00 GMT+1200 (NZST)
+
+    const today2 = getToday('Pacific/Chatham', new Date('2026-09-27T06:50:42.000Z')) // Sun Sep 27 2026 20:35:42 GMT+1345
+    expect(today2.toISOString()).to.equal('2026-09-26T11:15:00.000Z') // Sun Sep 27 2026 00:00:00 GMT+1245
+
+    const today3 = getToday('Australia/Sydney', new Date('2026-10-04T06:00:00.000Z')) // Sun Oct 04 2026 17:00:00 GMT+1100 (AEDT)
+    expect(today3.toISOString()).to.equal('2026-10-03T14:00:00.000Z') // Sun Oct 04 2026 00:00:00 GMT+1000 (AEST)
+  })
 })

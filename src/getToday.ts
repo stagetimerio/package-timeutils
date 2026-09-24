@@ -5,8 +5,6 @@ import { addMilliseconds } from 'date-fns/addMilliseconds'
 /**
  * Get the Date of 0:00 today in the given timezone
  *
- * Note: In some countries the DST change happens at 3AM, so we need to get a new offset for the "revert to UTC" operation.
- *
  * @param  {string} [timezone] - assumes 'UTC' if empty
  * @param  {Date} [now] - provide a date for 'today', must be in UTC, used for testing
  * @return {Date}
@@ -32,7 +30,12 @@ export function getToday (
   // Move time to 0:00:00
   inZone.setUTCHours(0, 0, 0, 0)
 
-  // Revert to UTC (zoned -> UTC)
-  const outputOffset = tz ? getTimezoneOffset(tz, inZone) : 0
-  return addMilliseconds(inZone, -outputOffset)
+  // Revert to UTC (zoned -> UTC). The first offset is read up to 14h away from
+  // local midnight and can sit across a DST change; the second read is at midnight.
+  const first = addMilliseconds(inZone, -getTimezoneOffset(tz, inZone))
+  const second = addMilliseconds(inZone, -getTimezoneOffset(tz, first))
+  if (second.getTime() + getTimezoneOffset(tz, second) === inZone.getTime()) return second
+
+  // Midnight is skipped by a DST change (e.g. Chile, Cuba): the later instant is the first of the day.
+  return first > second ? first : second
 }
