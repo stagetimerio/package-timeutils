@@ -28,9 +28,10 @@ export function getTimezoneOffset (
     if (!match) throw new Error('Unable to parse timezone offset')
     if (!match[1]) return 0
 
-    const hours = parseInt(match[1])
+    const sign = match[1].startsWith('-') ? -1 : 1
+    const hours = Math.abs(parseInt(match[1]))
     const minutes = parseInt(match[2] ?? '0')
-    const offset = (hours * 60 + minutes) * 60 * 1000
+    const offset = sign * (hours * 60 + minutes) * 60 * 1000
 
     return offset
   } catch (error) {

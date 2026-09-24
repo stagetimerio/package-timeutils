@@ -104,6 +104,13 @@ describe('getTimezoneOffset', () => {
     })
   })
 
+  describe('America/St_Johns', () => {
+    it('get correct offset for negative offsets with minutes', () => {
+      expect(getTimezoneOffset('America/St_Johns', new Date('2026-01-15T12:00:00.000Z'))).to.equal(-3.5 * 3600000)
+      expect(getTimezoneOffset('America/St_Johns', new Date('2026-07-15T12:00:00.000Z'))).to.equal(-2.5 * 3600000)
+    })
+  })
+
   describe('UTC and GMT', () => {
     it('get correct offset for UTC', () => {
       const date = new Date('2023-01-01T00:00:00.000Z')
