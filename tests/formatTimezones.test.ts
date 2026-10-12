@@ -121,4 +121,9 @@ describe('formatTimezone', () => {
       formatTimezone('America/Los_Angeles', 'invalid' as 'long')
     ).to.throw()
   })
+
+  it('should return an empty string for an invalid date', () => {
+    expect(formatTimezone('Europe/Berlin', 'abbr', new Date(NaN))).to.equal('')
+    expect(formatTimezone('Europe/Berlin', 'long', new Date(NaN))).to.equal('')
+  })
 })

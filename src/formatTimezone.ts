@@ -1,4 +1,5 @@
 import { abbreviations } from './abbreviations'
+import { isValidDate } from './isValidDate'
 
 type FormatOption = 'city' | 'long' | 'abbr' | 'offset'
 
@@ -15,14 +16,14 @@ type FormatOption = 'city' | 'long' | 'abbr' | 'offset'
  * @param {string} timezone - The IANA timezone string, e.g., 'America/Los_Angeles'.
  * @param {string|string[]} format - One of 'long', 'abbr', 'offset', or an array of these values.
  * @param {Date} date - The reference date used to determine the 'long', 'abbr' and 'offset'
- * @return {string} The formatted timezone string.
+ * @return {string} The formatted timezone string, empty for an invalid date.
  */
 export function formatTimezone (
   timezone: string,
   format: FormatOption | FormatOption[] = 'long',
   date: Date = new Date(),
 ): string {
-  if (!timezone) return ''
+  if (!timezone || !isValidDate(date)) return ''
 
   const formatOpts: Intl.DateTimeFormatOptions & { timeZone: string } = { timeZone: timezone }
   const formatArray = Array.isArray(format) ? format : [format]
