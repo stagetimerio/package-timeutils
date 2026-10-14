@@ -1,5 +1,6 @@
 import { abbreviations } from './abbreviations'
 import { isValidDate } from './isValidDate'
+import { formatZoneName } from './formatZoneName'
 
 type FormatOption = 'city' | 'long' | 'abbr' | 'offset'
 
@@ -25,7 +26,6 @@ export function formatTimezone (
 ): string {
   if (!timezone || !isValidDate(date)) return ''
 
-  const formatOpts: Intl.DateTimeFormatOptions & { timeZone: string } = { timeZone: timezone }
   const formatArray = Array.isArray(format) ? format : [format]
 
   for (const fmt of formatArray) {
@@ -36,12 +36,10 @@ export function formatTimezone (
       }
 
       case 'long':
-        formatOpts.timeZoneName = 'long'
-        return new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1] ?? ''
+        return formatZoneName(timezone, 'long', date)
 
       case 'abbr': {
-        formatOpts.timeZoneName = 'long'
-        const long = new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1]
+        const long = formatZoneName(timezone, 'long', date)
         if (!long) break
         const abbrMap = abbreviations as Record<string, string>
         const abbr = abbrMap[long] || abbrMap[long.replace('Standard ', '')]
@@ -52,11 +50,9 @@ export function formatTimezone (
       case 'offset': {
         let offset = ''
         try {
-          formatOpts.timeZoneName = 'longOffset'
-          offset = new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1] ?? ''
+          offset = formatZoneName(timezone, 'longOffset', date)
         } catch {
-          formatOpts.timeZoneName = 'short'
-          offset = new Intl.DateTimeFormat('en-US', formatOpts).format(date).split(', ')[1] ?? ''
+          offset = formatZoneName(timezone, 'short', date)
         }
         return offset === 'GMT' ? 'GMT+00:00' : offset
       }

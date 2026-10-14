@@ -1,4 +1,5 @@
 import { tzOffset } from '@date-fns/tz'
+import { formatZoneName } from './formatZoneName'
 
 /**
  * Get the timezone offset for a given date and timezone.
@@ -16,15 +17,10 @@ export function getTimezoneOffset (
 
   try {
     // Try the modern approach first (for newer browsers)
-    const options: Intl.DateTimeFormatOptions & { timeZone: string; timeZoneName: 'longOffset' } = {
-      timeZone: timezone,
-      timeZoneName: 'longOffset',
-    }
-    const formatted = new Intl.DateTimeFormat('en', options).format(date)
-    const offsetStr = formatted.split(', ')[1]
+    const offsetStr = formatZoneName(timezone, 'longOffset', date)
 
     // Parse offsetStr into milliseconds
-    const match = offsetStr?.match(/GMT(?:([+-]\d{2}):(\d{2}))?/)
+    const match = offsetStr.match(/GMT(?:([+-]\d{2}):(\d{2}))?/)
     if (!match) throw new Error('Unable to parse timezone offset')
     if (!match[1]) return 0
 

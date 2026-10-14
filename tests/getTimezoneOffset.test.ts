@@ -111,6 +111,13 @@ describe('getTimezoneOffset', () => {
     })
   })
 
+  describe('Africa/Monrovia', () => {
+    // @date-fns/tz tzOffset gets this sign wrong: +44.5 min.
+    it('keeps the sign of an offset under one hour west of UTC (-00:44 before 1972)', () => {
+      expect(getTimezoneOffset('Africa/Monrovia', new Date('1970-01-01T12:00:00.000Z'))).to.equal(-44 * 60000)
+    })
+  })
+
   describe('UTC and GMT', () => {
     it('get correct offset for UTC', () => {
       const date = new Date('2023-01-01T00:00:00.000Z')
