@@ -20,6 +20,35 @@ function insertBeforeSuffix (fmt: string, fragment: string): string {
   return fmt + fragment
 }
 
+const wallClockFormats = new Map<string, Intl.DateTimeFormat>()
+
+/**
+ * A local Date whose fields show the wall clock of `timezone` at `date`.
+ * Wrong by one hour in the hour the system clock skips at its own DST change.
+ */
+function toWallClock (date: Date, timezone: string): Date {
+  let format = wallClockFormats.get(timezone)
+  if (!format) {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+    })
+    wallClockFormats.set(timezone, format)
+  }
+  const parts = { year: 0, month: 0, day: 0, hour: 0, minute: 0, second: 0 }
+  for (const { type, value } of format.formatToParts(date)) {
+    if (type in parts) parts[type as keyof typeof parts] = Number(value)
+  }
+  // Some Chromium builds show midnight as 24 even with h23.
+  return new Date(parts.year, parts.month - 1, parts.day, parts.hour % 24, parts.minute, parts.second, date.getMilliseconds())
+}
+
 /**
  * Format the time of day with timezone support
  *
@@ -69,6 +98,11 @@ export function formatTimeOfDay (
   try {
     return fnsFormat(date, fmt, { in: tz(timezone) })
   } catch {
-    return '--:--'
+    // @date-fns/tz needs timeZoneName 'longOffset': Chromium 95+. BrightSign players run 87.
+    try {
+      return fnsFormat(toWallClock(date, timezone), fmt)
+    } catch {
+      return '--:--'
+    }
   }
 }
