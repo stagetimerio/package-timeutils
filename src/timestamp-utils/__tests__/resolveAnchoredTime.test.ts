@@ -1,5 +1,5 @@
 import { expect, describe, it } from 'vitest'
-import { resolveAnchoredTime } from '../resolveAnchoredTime'
+import { resolveAnchoredTime, resolveNearestTime } from '../resolveAnchoredTime'
 
 const at = (iso: string) => new Date(iso).getTime()
 const tod = (iso: string) => new Date(iso)
@@ -48,5 +48,34 @@ describe('resolveAnchoredTime', () => {
 
   it('returns 0 for an unparseable time rather than throwing', () => {
     expect(resolveAnchoredTime(new Date('nonsense'), at('2024-06-15T00:00:00.000Z'), 'UTC')).toBe(0)
+  })
+})
+
+describe('resolveNearestTime', () => {
+  const ref = at('2024-06-15T16:30:00.000Z')
+
+  it('stays on the reference day when that is nearest, even before the reference', () => {
+    expect(resolveNearestTime(tod('2022-01-01T06:30:00.000Z'), ref, 'UTC')).toBe(at('2024-06-15T06:30:00.000Z'))
+  })
+
+  it('rolls forward past midnight when the next day is nearer', () => {
+    expect(resolveNearestTime(tod('2022-01-01T02:00:00.000Z'), at('2024-06-15T23:00:00.000Z'), 'UTC')).toBe(at('2024-06-16T02:00:00.000Z'))
+  })
+
+  it('rolls back to the day before when that is nearer', () => {
+    expect(resolveNearestTime(tod('2022-01-01T23:00:00.000Z'), at('2024-06-15T01:00:00.000Z'), 'UTC')).toBe(at('2024-06-14T23:00:00.000Z'))
+  })
+
+  it('a tie, 12 hours either way, goes forward', () => {
+    expect(resolveNearestTime(tod('2022-01-01T04:30:00.000Z'), ref, 'UTC')).toBe(at('2024-06-16T04:30:00.000Z'))
+  })
+
+  it('reads the wall time in the timezone', () => {
+    // 06:30 Chicago (CDT, UTC−5) after a 16:30 Chicago finish is the same day.
+    expect(resolveNearestTime(tod('2022-07-01T11:30:00.000Z'), at('2024-06-15T21:30:00.000Z'), 'America/Chicago')).toBe(at('2024-06-15T11:30:00.000Z'))
+  })
+
+  it('returns 0 for an unparseable time rather than throwing', () => {
+    expect(resolveNearestTime(new Date('nonsense'), ref, 'UTC')).toBe(0)
   })
 })

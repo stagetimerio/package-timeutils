@@ -1,5 +1,5 @@
 import { hmsToMilliseconds } from './hmsToMilliseconds'
-import { resolveAnchoredTime } from './timestamp-utils/resolveAnchoredTime'
+import { resolveAnchoredTime, resolveNearestTime } from './timestamp-utils/resolveAnchoredTime'
 import { resolveMarkerBoundaries } from './timestamp-utils/resolveMarkerBoundaries'
 import { resolveSegments, type Segment } from './timestamp-utils/resolveSegments'
 import { resolveSegmentEntries } from './timestamp-utils/resolveSegmentEntries'
@@ -148,18 +148,23 @@ const TIMESTAMP_STATE = {
  * - **The rundown never runs backwards.** A typed time (`startTime`,
  *   `finishTime`, a marker's `time`, `target.time`) is a time-of-day; the
  *   calendar day it lands on follows from its position, never from the input.
- *   Every typed time resolves to the first occurrence of that time-of-day, in
- *   `timezone`, after its anchor: the start of its segment (the first cue's
- *   resolved start), or the segment's entry until it has one. A cue may land
- *   on the anchor itself; a closing marker or the target lands strictly
- *   after it, since a day cannot end when it begins — a day 2 starting 01:30
- *   and ending 01:30 is 24 hours long. So a cue typed earlier than the day's
- *   first cue rolls to the next morning, and a closing marker can never land
- *   before the cues it closes. Anchoring on the segment's *start* and not on
- *   the previous row is deliberate: a cue planned past the day's end shows
- *   as an overlap instead of silently rolling onto the next day. Resolution
- *   is therefore order-dependent — a typed start depends on the rows above
- *   it within its day, and on nothing outside it.
+ *   - A typed start below a planned finish lands on the occurrence
+ *     *nearest* that finish (a tie goes forward). So 02:00 after a 23:00
+ *     finish is the same night, and 06:30 after a 16:30 finish is an overlap,
+ *     not the next morning. A new day takes an End of Day.
+ *   - A typed finish lands on the first occurrence at or after the earlier
+ *     of its own start and the segment start. So a 06:00–19:00 cue is one
+ *     day, a start that slipped past its finish reads as an overlap, and a
+ *     06:30–08:30 cue typed before the day's 08:30 start is not split across
+ *     two days.
+ *   - Any other typed time lands on the first occurrence at or after its
+ *     anchor: the start of its segment (the first cue's resolved start), or
+ *     the segment's entry until it has one. A closing marker or
+ *     the target lands strictly after it, since a day cannot end when it
+ *     begins — a day 2 starting 01:30 and ending 01:30 is 24 hours long. So a
+ *     closing marker can never land before the cues it closes.
+ *   Resolution is therefore order-dependent — a typed time depends on the
+ *   rows above it within its day, and on nothing outside it.
  * - **Strict input shapes.** Callers normalize: `startTime` / `finishTime` are
  *   `Date | null`, `kickoff` etc. are epoch ms. Library does no parsing of
  *   ISO strings or wall-clock formats.
@@ -272,12 +277,18 @@ export function createTimestamps (
 
       // The first resolved start becomes the segment's, so a first cue's own
       // finish already counts from its start.
-      if (timer.startTime) plannedStart = resolveAnchoredTime(timer.startTime, segmentStart ?? entry, timezone)
-      else if (prev?.planned.finish) plannedStart = prev.planned.finish
+      if (timer.startTime) {
+        plannedStart = prev?.planned.finish
+          ? resolveNearestTime(timer.startTime, prev.planned.finish, timezone)
+          : resolveAnchoredTime(timer.startTime, segmentStart ?? entry, timezone)
+      } else if (prev?.planned.finish) plannedStart = prev.planned.finish
       segmentStart ??= plannedStart
 
       if (timer.type === TIMER_TYPES.FINISH_TIME) {
-        if (timer.finishTime) plannedFinish = resolveAnchoredTime(timer.finishTime, segmentStart ?? entry, timezone)
+        if (timer.finishTime) {
+          const finishAnchor = plannedStart ? Math.min(plannedStart, segmentStart!) : segmentStart ?? entry
+          plannedFinish = resolveAnchoredTime(timer.finishTime, finishAnchor, timezone)
+        }
 
         if (plannedStart && plannedFinish) {
           plannedDuration = plannedFinish - plannedStart

@@ -923,7 +923,7 @@ describe('createTimestamps', () => {
       expect(ts[0].planned.duration).toBe(min(180))
     })
 
-    it('FINISH_TIME: a finish counts from the segment start, so a slipped start reads as an overlap, not a day', () => {
+    it('FINISH_TIME: a slipped start reads as an overlap, not a day', () => {
       const lunch = makeTimer({ _id: '2', type: 'FINISH_TIME', finishTime: tod('13:00') })
       const ts = plan([cue('1', '12:00', 1, 30), lunch])
       expect(ts[1].planned.start).toBe(at('2026-09-03T13:30:00.000Z'))
@@ -1086,11 +1086,39 @@ describe('createTimestamps', () => {
       expect(ts[3].segmentEnd! - ts[3].planned.finish!).toBe(0)
     })
 
-    it('accepted: typed times inside a long segment resolve within 24h of its start, the rows above show as overlap', () => {
+    it('a typed time follows the chain, not the segment start: after 24h of cues, 10:00 is the next day', () => {
       const ts = plan([cue('1', '09:00', 8), cue('2', null, 8), cue('3', null, 8), cue('4', '10:00', 1)])
       expect(ts[2].planned.finish).toBe(at('2026-09-04T09:00:00.000Z'))
-      expect(ts[3].planned.start).toBe(at('2026-09-03T10:00:00.000Z'))
-      expect(ts[3].gap).toBe(-min(23 * 60))
+      expect(ts[3].planned.start).toBe(at('2026-09-04T10:00:00.000Z'))
+      expect(ts[3].gap).toBe(min(60))
+    })
+
+    it('a start typed hours before the previous finish is an overlap, not the next morning: 06:30 after a 16:30 finish', () => {
+      const ts = plan([cue('1', '08:30', 8), cue('2', '06:30', 2), cue('3', null, 1)])
+      expect(ts[1].planned.start).toBe(at('2026-09-03T06:30:00.000Z'))
+      expect(ts[1].gap).toBe(-min(10 * 60))
+      expect(ts[2].planned.start).toBe(at('2026-09-03T08:30:00.000Z'))
+    })
+
+    it('a day that runs into the small hours: 02:00 after a 23:00 finish is the same night', () => {
+      const ts = plan([cue('1', '20:00', 3), cue('2', '02:00', 1)])
+      expect(ts[1].planned.start).toBe(at('2026-09-04T02:00:00.000Z'))
+      expect(ts[1].gap).toBe(min(3 * 60))
+    })
+
+    it('FINISH_TIME: a long cue in the middle of a day keeps its finish on that day', () => {
+      const expo = makeTimer({ _id: '2', type: 'FINISH_TIME', startTime: tod('07:00'), finishTime: tod('20:00') })
+      const ts = plan([cue('1', '06:00', 1), expo])
+      expect(ts[1].planned.finish).toBe(at('2026-09-03T20:00:00.000Z'))
+      expect(ts[1].planned.duration).toBe(min(13 * 60))
+    })
+
+    it('FINISH_TIME: a cue typed before the day\'s start keeps start and finish on the same day', () => {
+      const morning = makeTimer({ _id: '2', type: 'FINISH_TIME', startTime: tod('06:30'), finishTime: tod('08:30') })
+      const ts = plan([cue('1', '08:30', 8), morning])
+      expect(ts[1].planned.start).toBe(at('2026-09-03T06:30:00.000Z'))
+      expect(ts[1].planned.finish).toBe(at('2026-09-03T08:30:00.000Z'))
+      expect(ts[1].planned.duration).toBe(min(120))
     })
   })
 
