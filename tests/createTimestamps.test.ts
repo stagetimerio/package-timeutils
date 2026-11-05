@@ -1120,6 +1120,56 @@ describe('createTimestamps', () => {
       expect(ts[1].planned.finish).toBe(at('2026-09-03T08:30:00.000Z'))
       expect(ts[1].planned.duration).toBe(min(120))
     })
+
+    it('a long daytime gap stays on its day: 21:00 after a 07:00 finish is that evening', () => {
+      const ts = plan([cue('1', '06:00', 1), cue('2', '21:00', 2)])
+      expect(ts[1].planned.start).toBe(at('2026-09-03T21:00:00.000Z'))
+      expect(ts[1].gap).toBe(min(14 * 60))
+    })
+
+    it('a night that runs on: 13:00 after a 03:00 finish is the next afternoon', () => {
+      const ts = plan([cue('1', '20:00', 3), cue('2', '02:00', 1), cue('3', '13:00', 1)])
+      expect(ts[2].planned.start).toBe(at('2026-09-04T13:00:00.000Z'))
+      expect(ts[2].gap).toBe(min(10 * 60))
+    })
+
+    describe('T76: three show days with one End of Day (ICM room, 4.11.2026, America/Chicago)', () => {
+      // The bug: day 1 and day 2 had no End of Day between them. Day 2's
+      // "Good Morning!" (FINISH_TIME 6:30–8:30 AM) came after a 4:30 PM finish.
+      // Its start wrapped to the next morning, its finish did not: "Start time
+      // (6:30 AM Tomorrow CST) is after finish time (8:30 AM Today CST)". The
+      // chained cues below it fell back to day 1's date.
+      const chicago = (cues: TimerInput[], markers: MarkerInput[]) =>
+        createTimestamps(cues, makeTimeset({ timerId: null }), 'America/Chicago', at('2026-11-03T12:00:00.000Z'), '2026-11-04', {}, null, markers)
+      const goodMorning = (_id: string) =>
+        makeTimer({ _id, type: 'FINISH_TIME', startTime: tod('12:30'), finishTime: tod('14:30') }) // 6:30–8:30 AM CST
+      const rundown = () => [
+        cue('1', '14:30', 8), // day 1: 8:30 AM–4:30 PM CST
+        goodMorning('2'), // day 2
+        cue('3', null, 8),
+        goodMorning('4'), // day 3, below the one End of Day
+        cue('5', null, 8),
+      ]
+
+      it('without an End of Day above day 2: an overlap on day 1, no half-wrapped cue', () => {
+        const ts = chicago(rundown(), [eod('m1', null, '4')])
+        expect(ts[1].planned.start).toBe(at('2026-11-04T12:30:00.000Z'))
+        expect(ts[1].planned.finish).toBe(at('2026-11-04T14:30:00.000Z'))
+        expect(ts[1].planned.duration).toBe(min(120))
+        expect(ts[1].gap).toBe(-min(10 * 60))
+        expect(ts[2].planned.start).toBe(at('2026-11-04T14:30:00.000Z'))
+        expect(ts[3].planned.start).toBe(at('2026-11-05T12:30:00.000Z'))
+      })
+
+      it('with an End of Day above day 2 (the workaround): three days on three dates', () => {
+        const ts = chicago(rundown(), [eod('m0', null, '2'), eod('m1', null, '4')])
+        expect(ts.map((t) => t.segmentIndex)).toEqual([0, 1, 1, 2, 2])
+        expect(ts[1].planned.start).toBe(at('2026-11-05T12:30:00.000Z'))
+        expect(ts[1].planned.finish).toBe(at('2026-11-05T14:30:00.000Z'))
+        expect(ts[2].planned.start).toBe(at('2026-11-05T14:30:00.000Z'))
+        expect(ts[3].planned.start).toBe(at('2026-11-06T12:30:00.000Z'))
+      })
+    })
   })
 
   describe('timezone + roomDate handling', () => {

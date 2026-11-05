@@ -149,9 +149,10 @@ const TIMESTAMP_STATE = {
  *   `finishTime`, a marker's `time`, `target.time`) is a time-of-day; the
  *   calendar day it lands on follows from its position, never from the input.
  *   - A typed start below a planned finish lands on the occurrence
- *     *nearest* that finish (a tie goes forward). So 02:00 after a 23:00
- *     finish is the same night, and 06:30 after a 16:30 finish is an overlap,
- *     not the next morning. A new day takes an End of Day.
+ *     *nearest* that finish (a tie goes forward), never on a date before the
+ *     segment start's. So 02:00 after a 23:00 finish is the same night, 06:30
+ *     after a 16:30 finish is an overlap, not the next morning, and 21:00
+ *     after a 07:00 finish is that evening. A new day takes an End of Day.
  *   - A typed finish lands on the first occurrence at or after the earlier
  *     of its own start and the segment start. So a 06:00–19:00 cue is one
  *     day, a start that slipped past its finish reads as an overlap, and a
@@ -279,7 +280,7 @@ export function createTimestamps (
       // finish already counts from its start.
       if (timer.startTime) {
         plannedStart = prev?.planned.finish
-          ? resolveNearestTime(timer.startTime, prev.planned.finish, timezone)
+          ? resolveNearestTime(timer.startTime, prev.planned.finish, timezone, { dayStart: segmentStart })
           : resolveAnchoredTime(timer.startTime, segmentStart ?? entry, timezone)
       } else if (prev?.planned.finish) plannedStart = prev.planned.finish
       segmentStart ??= plannedStart

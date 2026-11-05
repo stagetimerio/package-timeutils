@@ -1,5 +1,6 @@
 import { applyDate } from '../applyDate'
 import { addDays } from 'date-fns/addDays'
+import { startOfDay } from 'date-fns/startOfDay'
 import { tz } from '@date-fns/tz'
 
 /**
@@ -30,20 +31,26 @@ export function resolveAnchoredTime (
 
 /**
  * Resolve a wall-clock time to epoch ms: the occurrence of `rawInput`'s
- * time-of-day, read in `timezone`, nearest to `reference`. A tie (12 hours
- * either way) goes forward. The date part of `rawInput` is ignored.
+ * time-of-day, read in `timezone`, nearest to `reference` and not on a
+ * calendar day before `dayStart`'s. A tie (12 hours either way) goes forward. The date part of
+ * `rawInput` is ignored.
  *
  * A typed time inside a day: 02:00 after a 23:00 finish is the same night,
- * 06:30 after a 16:30 finish is an overlap, not the next morning.
+ * 06:30 after a 16:30 finish is an overlap, not the next morning, and 21:00
+ * after a 07:00 finish is that evening, not the one before.
  */
 export function resolveNearestTime (
   rawInput: Date,
   reference: number,
   timezone: string | undefined = 'UTC',
+  { dayStart }: { dayStart?: number | null } = {},
 ): number {
   const onReferenceDay = applyDate(rawInput, new Date(reference), timezone)
   if (!onReferenceDay) return 0
-  const candidates = [-1, 0, 1].map((d) => addDays(onReferenceDay, d, { in: tz(timezone) }).getTime())
+  const floor = dayStart == null ? -Infinity : startOfDay(dayStart, { in: tz(timezone) }).getTime()
+  const candidates = [-1, 0, 1]
+    .map((d) => addDays(onReferenceDay, d, { in: tz(timezone) }).getTime())
+    .filter((ms) => ms >= floor)
   return candidates.reduce((best, ms) => {
     const diff = Math.abs(ms - reference) - Math.abs(best - reference)
     return diff < 0 || (diff === 0 && ms > best) ? ms : best

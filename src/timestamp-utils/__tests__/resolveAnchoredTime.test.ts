@@ -78,4 +78,20 @@ describe('resolveNearestTime', () => {
   it('returns 0 for an unparseable time rather than throwing', () => {
     expect(resolveNearestTime(new Date('nonsense'), ref, 'UTC')).toBe(0)
   })
+  it('never lands on a calendar day before dayStart\'s: 21:00 after a 07:00 finish is that evening', () => {
+    const dayStart = at('2024-06-15T06:00:00.000Z')
+    expect(resolveNearestTime(tod('2022-01-01T21:00:00.000Z'), at('2024-06-15T07:00:00.000Z'), 'UTC')).toBe(at('2024-06-14T21:00:00.000Z'))
+    expect(resolveNearestTime(tod('2022-01-01T21:00:00.000Z'), at('2024-06-15T07:00:00.000Z'), 'UTC', { dayStart })).toBe(at('2024-06-15T21:00:00.000Z'))
+  })
+
+  it('dayStart still allows an earlier time on the same date: 06:30 after 16:30', () => {
+    expect(resolveNearestTime(tod('2022-01-01T06:30:00.000Z'), ref, 'UTC', { dayStart: at('2024-06-15T08:30:00.000Z') })).toBe(at('2024-06-15T06:30:00.000Z'))
+  })
+
+  it('reads dayStart\'s midnight in the timezone', () => {
+    // 9:30 PM CDT after an 8:00 AM CDT finish is that evening. A UTC midnight
+    // (00:00Z) would let the evening before (02:30Z) through.
+    const dayStart = at('2024-06-15T12:00:00.000Z')
+    expect(resolveNearestTime(tod('2022-07-01T02:30:00.000Z'), at('2024-06-15T13:00:00.000Z'), 'America/Chicago', { dayStart })).toBe(at('2024-06-16T02:30:00.000Z'))
+  })
 })
